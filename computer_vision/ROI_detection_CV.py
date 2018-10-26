@@ -20,7 +20,7 @@ from utils_common.ROI_detection import *
 
 if __name__ == "__main__":
     # Parameters
-    datadir = "dataset/"
+    datadir = "../dataset/"
     result_dir = "results_CV/"
     cmap = matplotlib.cm.get_cmap("autumn")
     channels_to_process = [0] # R,G,B <--> 0,1,2
