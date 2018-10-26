@@ -15,7 +15,7 @@ from skimage import measure, io, feature, color, filters
 from skimage import morphology as morph
 from skimage.morphology import disk
 
-from utils_ROI_detection import *
+from utils_common.ROI_detection import *
 
 
 if __name__ == "__main__":
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     datadir = "dataset/"
     result_dir = "results_CV/"
     cmap = matplotlib.cm.get_cmap("autumn")
-    channel_to_process = [0] # R,G,B <--> 0,1,2
+    channels_to_process = [0] # R,G,B <--> 0,1,2
     
     os.makedirs(result_dir, exist_ok=True)
     losses_mae = []
@@ -37,8 +37,8 @@ if __name__ == "__main__":
         # Load stacks
         rgb_stack = imread_to_float(os.path.join(datadir, subdir, "RGB.tif"))
         stack = np.zeros(rgb_stack.shape[:-1], dtype=rgb_stack.dtype)
-        for channel in channel_to_process:
-            stack += rgb_stack[:,:,:,channel] / len(channel_to_process)
+        for channel in channels_to_process:
+            stack += rgb_stack[:,:,:,channel] / len(channels_to_process)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             stack_pp = preprocess_stack(stack)

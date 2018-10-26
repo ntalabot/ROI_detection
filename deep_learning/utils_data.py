@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 import torch
 from torch.utils import data
 
-from utils_ROI_detection import imread_to_float
+from utils_common.ROI_detection import imread_to_float
 
 
 class ImageLoaderDataset(data.Dataset):
