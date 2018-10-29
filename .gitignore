@@ -6,3 +6,7 @@
 # Caches and checkpoints
 */__pycache__
 */.ipynb_checkpoints
+
+# Pytorch models/checkpoints
+*.pt
+*.pth
