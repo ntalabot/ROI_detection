@@ -11,3 +11,6 @@
 deep_learning/models
 *.pt
 *.pth
+
+# Results
+deep_learning/custom_unet

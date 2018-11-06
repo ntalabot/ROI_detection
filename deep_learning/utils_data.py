@@ -20,7 +20,8 @@ from utils_common.ROI_detection import imread_to_float
 class ImageLoaderDataset(data.Dataset):
     """Dataset that loads image online for efficient memory usage."""
     
-    def __init__(self, x_filenames, y_filenames, input_channels="RGB", transform=None, target_transform=None):
+    def __init__(self, x_filenames, y_filenames, input_channels="RGB", 
+                 transform=None, target_transform=None):
         """
         Args:
             x_filenames (list of str): contains the filenames/path to the input images
@@ -92,14 +93,13 @@ def get_filenames(data_dir, valid_extensions = ('.png', '.jpg', '.jpeg')):
         for frame_filename in sorted(os.listdir(os.path.join(data_dir, data_subdir, "seg_frames"))):
             if frame_filename.lower().endswith(valid_extensions):
                 y_filenames.append(os.path.join(data_dir, data_subdir, "seg_frames", frame_filename))
-        break # XXX:### Take only 1 stack over whole dataset ###
         
     return x_filenames, y_filenames
 
 
 def get_dataloaders(x_filenames, y_filenames, train_ratio, batch_size,
                     input_channels="RG", train_transform=None, valid_transform=None):
-    """Return the train and validation dataloaders."""
+    """Return a dataloader dictionary with the train and validation dataloaders."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         x_train, x_valid, y_train, y_valid = train_test_split(x_filenames, y_filenames, 
@@ -118,12 +118,12 @@ def get_dataloaders(x_filenames, y_filenames, train_ratio, batch_size,
                                    batch_size = batch_size,
                                    shuffle = False,
                                    num_workers = 1)
-    return train_loader, valid_loader
+    return {"train": train_loader, "valid": valid_loader}
 
 
 ## Image manipulations
 
-def normalize_symmetric_range(images):
+def normalize_range(images):
     """Normalize the given float images by changing their range from [0,1] to [-1,1]."""
     return images * 2.0 - 1.0
 
@@ -133,5 +133,6 @@ def make_images_valid(images):
     images = (images - images.min()) / (images.max() - images.min())
     if images.shape[1] == 2:
         shape = (images.shape[0], 1) + images.shape[2:]
-        images = torch.cat([images, torch.zeros(shape, dtype=images.dtype)], 1)
+        zero_padding = torch.zeros(shape, dtype=images.dtype).to(images.device)
+        images = torch.cat([images, zero_padding], 1)
     return images

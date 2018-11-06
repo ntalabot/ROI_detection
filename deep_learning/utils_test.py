@@ -26,6 +26,7 @@ def predict(model, dataloader, post_processing=None, discard_target=True):
             if discard_target:
                 batch = batch[0]
                 
+            batch = batch.to(model.device)
             predictions.append(model(batch))
     
     # Post-process them
@@ -45,12 +46,15 @@ def evaluate(model, dataloader, metrics):
     model.eval()
     with torch.no_grad():
         for i, (batch_x, batch_y) in enumerate(dataloader):
+            batch_x = batch_x.to(model.device)
+            batch_y = batch_y.to(model.device)
+            
             y_pred = model(batch_x)
 
             for key in metrics.keys():
                 values[key] += metrics[key](y_pred, batch_y).item() * batch_x.shape[0]
             
-    for key in metrics.keys():
+    for key in values.keys():
         values[key] /= len(dataloader.dataset)
     return values
 
@@ -61,6 +65,8 @@ def show_sample(model, dataloader, n_samples=4, post_processing=None, metrics=No
     
     inputs = torch.stack([torch.from_numpy(dataloader.dataset[i][0]) for i in indices])
     targets = torch.stack([torch.from_numpy(dataloader.dataset[i][1]) for i in indices])
+    inputs = inputs.to(model.device)
+    targets = targets.to(model.device)
     
     with torch.no_grad():
         model.eval()
@@ -85,12 +91,12 @@ def show_sample(model, dataloader, n_samples=4, post_processing=None, metrics=No
                 print("{} = {:.6}; ".format(key, metrics[key](preds[i].unsqueeze(0), 
                                                               targets[i].unsqueeze(0))))
         
-    plt.figure(figsize=(10,8))
+    plt.figure(figsize=(12,10))
     plt.subplot(311); plt.title("Inputs")
-    plt.imshow(outs.numpy().transpose([1,2,0]))
+    plt.imshow(outs.cpu().numpy().transpose([1,2,0]))
     plt.subplot(312); plt.title("Predictions")
-    plt.imshow(outs_p.numpy().transpose([1,2,0]))
+    plt.imshow(outs_p.cpu().numpy().transpose([1,2,0]))
     plt.subplot(313); plt.title("Ground truths")
-    plt.imshow(outs_t.numpy().transpose([1,2,0]))
+    plt.imshow(outs_t.cpu().numpy().transpose([1,2,0]))
     plt.tight_layout()
     plt.show()

@@ -30,24 +30,156 @@ def weights_initialization(model):
                 torch.nn.init.zeros_(m.bias)
 
 
-class CustomNet(torch.nn.Module):
-    def __init__(self, shape):
+#class CustomNet(torch.nn.Module):
+#    def __init__(self, shape, activation=torch.nn.ReLU, device=torch.device("cpu")):
+#        """Initialize the model."""
+#        super(CustomNet, self).__init__()
+#        self.height, self.width, self.in_channels = shape
+#        self.activation = activation
+#        
+#        # Initialize the networks modules
+#        self.conv1 = torch.nn.Conv2d(self.in_channels, 4, 3, stride=3, padding=1)
+#        self.bn1 = torch.nn.BatchNorm2d(4)
+#        self.conv2 = torch.nn.Conv2d(4, 8, 3, stride=3, padding=1)
+#        self.bn2 = torch.nn.BatchNorm2d(8)
+#        self.conv_t1 = torch.nn.ConvTranspose2d(8, 4, 3, stride=3, padding=1, output_padding=(1,0))
+#        self.bn3 = torch.nn.BatchNorm2d(4)
+#        self.conv_t2 = torch.nn.ConvTranspose2d(4, 1, 3, stride=3, padding=(2, 0), output_padding=(1,1))
+#        
+#        # Initialize weights
+#        weights_initialization(self)
+#        
+#        # Make sure the model is in the correct device
+#        self.to(device)
+#
+#    def forward(self, x):
+#        """Perform the forward pass."""
+#        x = self.activation(self.conv1(x))
+#        x = self.bn1(x)
+#        x = self.activation(self.conv2(x))
+#        x = self.bn2(x)
+#        x = self.activation(self.conv_t1(x))
+#        x = self.bn3(x)
+#        logits = self.conv_t2(x)
+#        logits = logits.view(-1, self.height, self.width)
+#        return logits
+#    
+#    def to(self, *args, **kwargs):
+#        """Modifiy model.device and call Module.to()."""
+#        device, _, _ = torch._C._nn._parse_to(*args, **kwargs)
+#        self.device = device
+#        return super(CustomNet, self).to(*args, **kwargs)
+
+
+class UNetConv(torch.nn.Module):
+    """U-Net like convolution block."""
+    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, 
+                 activation=torch.nn.ReLU(), batchnorm=False):
+        super(UNetConv, self).__init__()
+        self.activation = activation
+        self.batchnorm = batchnorm
+        
+        self.conv1 = torch.nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
+        if self.batchnorm:
+            self.bn1 = torch.nn.BatchNorm2d(out_channels)
+        self.conv2 = torch.nn.Conv2d(out_channels, out_channels, kernel_size, padding=padding)
+        if self.batchnorm:
+            self.bn2 = torch.nn.BatchNorm2d(out_channels)
+
+    def forward(self, x):
+        x = self.activation(self.conv1(x))
+        if self.batchnorm:
+            x = self.bn1(x)
+        out = self.activation(self.conv2(x))
+        if self.batchnorm:
+            out = self.bn2(out)
+        return out
+
+
+class UNetUpConv(torch.nn.Module):
+    """U-Net like up-convolution block."""
+    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1,
+                 activation=torch.nn.ReLU(), batchnorm=False):
+        super(UNetUpConv, self).__init__()
+        self.activation = activation
+        self.batchnorm = batchnorm
+        
+        self.upconv = torch.nn.ConvTranspose2d(in_channels, out_channels, 2, stride=2)
+        self.conv1 = torch.nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
+        if self.batchnorm:
+            self.bn1 = torch.nn.BatchNorm2d(out_channels)
+        self.conv2 = torch.nn.Conv2d(out_channels, out_channels, kernel_size, padding=padding)
+        if self.batchnorm:
+            self.bn2 = torch.nn.BatchNorm2d(out_channels)
+
+    def forward(self, x, bridge):
+        x = self.upconv(x)
+        out = torch.cat([x, bridge], 1)
+        
+        out = self.activation(self.conv1(out))
+        if self.batchnorm:
+            out = self.bn1(out)
+        out = self.activation(self.conv2(out))
+        if self.batchnorm:
+            out = self.bn2(out)
+        return out
+   
+
+class CustomUNet(torch.nn.Module):
+    def __init__(self, in_channels, out1_channels=8, u_depth=1,
+                 activation=torch.nn.ReLU(), batchnorm=False,
+                 device=torch.device("cpu")):
         """Initialize the model."""
-        super(CustomNet, self).__init__()
-        self.height, self.width, self.n_channels_in = shape
+        super(CustomUNet, self).__init__()
+        self.in_channels = in_channels
+        self.activation = activation
+        self.maxpool = torch.nn.MaxPool2d(2)
+        if u_depth < 1:
+            raise ValueError("Depth of the U-Net has to be at least 1 (given u_depth=%d)" % u_depth)
         
         # Initialize the networks modules
-        self.conv1 = torch.nn.Conv2d(self.n_channels_in, 8, 3, stride=3, padding=1)
-        self.bn1 = torch.nn.BatchNorm2d(8)
-        self.conv_t1 = torch.nn.ConvTranspose2d(8, 1, 3, stride=3, padding=1, output_padding=(2,0))
+        self.convs = torch.nn.ModuleList()
+        self.convs.append(UNetConv(self.in_channels, out1_channels, activation=activation, batchnorm=batchnorm))
+        for i in range(1, u_depth):
+            self.convs.append(UNetConv(out1_channels * (2 ** (i-1)), out1_channels * (2 ** i), 
+                                       activation=activation, batchnorm=batchnorm))
+            
+        self.midconv = UNetConv(out1_channels * (2 ** (u_depth-1)), out1_channels * (2 ** u_depth),
+                                activation=activation, batchnorm=batchnorm)
+        
+        self.upconvs = torch.nn.ModuleList()
+        for i in range(u_depth, 0, -1):
+            self.upconvs.append(UNetUpConv(out1_channels * (2 ** i), out1_channels * (2 ** (i-1)), 
+                                           activation=activation, batchnorm=batchnorm))
+            
+        self.outconv = torch.nn.Conv2d(out1_channels, 1, 1)
         
         # Initialize weights
         weights_initialization(self)
+        
+        # Make sure the model is in the correct device
+        self.to(device)
 
     def forward(self, x):
         """Perform the forward pass."""
-        x = self.conv1(x).clamp(min=0)
-        x = self.bn1(x)
-        logits = self.conv_t1(x)
-        logits = logits.view(-1, self.height, self.width)
+        x_convs = []
+        x_pool = x
+        for i in range(len(self.convs)):
+            x_convs.append(self.convs[i](x_pool))
+            x_pool = self.maxpool(x_convs[i])
+        
+        x_mid = self.midconv(x_pool)
+        
+        x_up = self.upconvs[0](x_mid, x_convs.pop(-1))
+        for i in range(1, len(self.upconvs)):
+            x_up = self.upconvs[i](x_up, x_convs.pop(-1))
+            
+        logits = self.outconv(x_up)
+        logits.squeeze_(dim=1)
         return logits
+    
+    def to(self, *args, **kwargs):
+        """Modifiy model.device and call Module.to()."""
+        device, _, _ = torch._C._nn._parse_to(*args, **kwargs)
+        self.device = device
+        return super(CustomUNet, self).to(*args, **kwargs)

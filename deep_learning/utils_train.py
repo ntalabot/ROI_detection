@@ -22,7 +22,7 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
         model: the PyTorch model
         dataloaders (dict): contains the train and validation DataLoaders with
             respective keys "train" and "valid"
-        loss (callable): the PyTorch loss function. Should take 2 tensors in 
+        loss_fn (callable): the PyTorch loss function. Should take 2 tensors in 
             (predictions and targets), and output a tensor
         optimizer: the PyTorch optimizer
         n_epochs (int): number of epochs (pass over the total data)
@@ -51,6 +51,7 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
         save_dir = tempfile.mkdtemp()
     else:
         save_dir = model_dir
+    os.makedirs(save_dir, exist_ok=replace_dir)
         
     history = {"loss": [], "val_loss": [], "epoch": []}
     for key in metrics.keys():
@@ -87,10 +88,12 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
             
             # Iterate over the data
             for i, (batch_x, batch_y) in enumerate(dataloaders[phase]): 
-                # TODO: input to device
+                # Copy tensor to the model device
+                batch_x = batch_x.to(model.device)
+                batch_y = batch_y.to(model.device)
                 
-                # Forward pass
                 with torch.set_grad_enabled(phase == "train"):
+                    # Forward pass
                     y_pred = model(batch_x)
                     
                     # Loss
@@ -103,8 +106,8 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
                             metrics[key](y_pred, batch_y).item() * batch_x.shape[0]
                         
                     if phase == "train":
-                        if ((i + 1) % 25 == 0 or i == 0) and verbose: 
-                            print("%d..." % (i + 1), end="")
+                        if ((i + 1) % int(len(dataloaders[phase]) / 10) == 0 or i == 0) and verbose: 
+                            print("%d..." % (i + 1), end="", flush=True)
                         
                         # Backward pass
                         optimizer.zero_grad()
@@ -128,7 +131,7 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
             # Print them
             if verbose:
                 phase_msg = "{} loss: {:.6f}".format(phase.capitalize(), 
-                             running_metrics[key] / len(dataloaders[phase].dataset))
+                             running_loss / len(dataloaders[phase].dataset))
                 for key in metrics.keys():
                     phase_msg += " - {}: {:.6f}".format(key,
                                      running_metrics[key] / len(dataloaders[phase].dataset))
@@ -142,7 +145,6 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
         if criterion_val > best_val_criterion:
             best_val_criterion = criterion_val
             # Save model state dict
-            # TODO: save model architecture
             torch.save(model.state_dict(), os.path.join(save_dir, "model_best.pt"))
         
         if verbose:
