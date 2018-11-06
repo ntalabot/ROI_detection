@@ -39,9 +39,6 @@ def _compute_shifts(ref_image, shifted_image, return_error=False):
         error = 1.0 - CCmax * CCmax.conjugate() / (rgzero * rfzero)
         error = np.sqrt(np.abs(error));
 
-    # Compute shifts
-    phase_shift = np.angle(CCmax); # probably useless as always 0 for non-negative images
-
     md2 = np.fix(m/2.0) #should this be float?
     nd2 = np.fix(n/2.0)
     if rloc > md2:
@@ -55,15 +52,15 @@ def _compute_shifts(ref_image, shifted_image, return_error=False):
         col_shift = cloc;#CHECK!
     
     if return_error:
-        output = [col_shift, row_shift, phase_shift, error]
+        output = [row_shift, col_shift, error]
     else:
-        output = [col_shift, row_shift, phase_shift]
+        output = [row_shift, col_shift]
         
     return output
 
 
-def _register_image(shifted_image, col_shift, row_shift, phase_shift):
-    """Register the shifted image by the given row, col and phase shifts"""
+def shift_image(shifted_image, row_shift, col_shift):
+    """Register the shifted image by the given row and col shifts"""
     buf2ft = np.fft.fft2(shifted_image)
     nr, nc = buf2ft.shape
 
@@ -73,7 +70,6 @@ def _register_image(shifted_image, col_shift, row_shift, phase_shift):
     [Nc, Nr] = np.meshgrid(Nc, Nr)
     
     greg = buf2ft * np.exp(2j * np.pi * (-row_shift * Nr/nr - col_shift * Nc/nc));
-    greg = greg * np.exp(1j * phase_shift);
 
     if np.can_cast(np.float32, shifted_image.dtype): # need to check this, too
         registered_image = np.abs(np.fft.ifft2(greg))
@@ -83,7 +79,7 @@ def _register_image(shifted_image, col_shift, row_shift, phase_shift):
     return registered_image
 
 
-def register_stack(stack, ref_num=0, channels=[0,1]):
+def register_stack(stack, ref_num=0, channels=[0,1], return_shifts=False):
     """Register the stack using cross-correlation."""
     reg_stack = np.zeros(stack.shape, dtype=stack.dtype)
     
@@ -99,21 +95,23 @@ def register_stack(stack, ref_num=0, channels=[0,1]):
     # Compute the shifts
     col_list=[]
     row_list=[]
-    phase_list=[]
     for i in range(0, len(stack_to_reg)): 
         img = stack_to_reg[i]
     
-        col, row, phase = _compute_shifts(ref_img, img, return_error=False)
-        col_list.append(col)
+        row, col = _compute_shifts(ref_img, img, return_error=False)
         row_list.append(row)
-        phase_list.append(phase)
+        col_list.append(col)
     
     # Register the images
     for i in range(0, len(reg_stack)): 
         if stack.ndim == 3:
-            reg_stack[i] = _register_image(stack[i], col_list[i], row_list[i], phase_list[i])
+            reg_stack[i] = shift_image(stack[i], row_list[i], col_list[i])
         else:
             for c in channels:
-                reg_stack[i,:,:,c] = _register_image(stack[i,:,:,c], col_list[i], row_list[i], phase_list[i])
+                reg_stack[i,:,:,c] = shift_image(stack[i,:,:,c], row_list[i], col_list[i])
+    reg_stack = reg_stack.clip(min=0.0, max=1.0)
     
-    return reg_stack.clip(min=0.0, max=1.0)
+    if return_shifts:
+        return reg_stack, row_list, col_list
+    else:
+        return reg_stack
