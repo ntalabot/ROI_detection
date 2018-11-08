@@ -12,11 +12,29 @@ import numpy as np
 
 def _compute_shifts(ref_image, shifted_image, return_error=False):
     """
-    col_shift, row_shift, phase_shift, [error] = 
-        compute_shifts(ref_image, shifted_image, return_error=False)
+    Compute and return the row and column shifts between the reference and shifted images.
     
-    Translated from MATLAB code written by Manuel Guizar
-    downloaded from http://www.mathworks.com/matlabcentral/fileexchange/18401-efficient-subpixel-image-registration-by-cross-correlation
+    Args:
+        ref_image: ndarray
+            Reference image for the shifts computation, it should be 
+            2-dimensional (i.e., a grayscale image).
+        shifted_image: ndarray
+            Shifted reference image, it should also be 2-dimensional.
+        return_error: bool (default = False)
+            If True, the normalized root-mean-square error between `ref_image` 
+            and `shifted_image` is returned as a third output.
+    
+    Returns:
+        row_shift: int
+            The shift in the row coordinate.
+        col_shift: int
+            The shift in the col coordinate.
+        [error]: float, optional
+            The normalized root-mean-square error between `ref_image` 
+            and `shifted_image`
+    
+    Translated by #TODO: from MATLAB code written by Manuel Guizar, downloaded 
+    from http://www.mathworks.com/matlabcentral/fileexchange/18401-efficient-subpixel-image-registration-by-cross-correlation
     """
     # Compute FFTs, and cross-correlation
     buf1ft = np.fft.fft2(ref_image)
@@ -60,7 +78,7 @@ def _compute_shifts(ref_image, shifted_image, return_error=False):
 
 
 def shift_image(shifted_image, row_shift, col_shift):
-    """Register the shifted image by the given row and col shifts"""
+    """Register the shifted image by the given row and col shifts."""
     buf2ft = np.fft.fft2(shifted_image)
     nr, nc = buf2ft.shape
 
@@ -80,7 +98,34 @@ def shift_image(shifted_image, row_shift, col_shift):
 
 
 def register_stack(stack, ref_num=0, channels=[0,1], return_shifts=False):
-    """Register the stack using cross-correlation."""
+    """
+    Register the stack using the cross-correlation method.
+    For more details, see: Manuel Guizar-Sicairos, Samuel T. Thurman, and 
+    James R. Fienup, "Efficient subpixel image registration algorithms," 
+    Opt. Lett. 33, 156-158 (2008). 
+    
+    Args:
+        stack: ndarray
+            The stack of images. They can be grayscale or color (see `channels`
+            argument).
+        ref_num: int (default = 0)
+            The number of the frame to take as reference. Every frame will be 
+            registered to this one.
+        channels: list of int (default = [0,1])
+            Channels over which to compute the average if the images are color,
+            as the alogorithm requires grayscale images.
+        return_shifts: bool (default = False)
+            If True, the function also returns the list of row and column shifts
+            for each frame in the stack.
+          
+    Returns:
+        reg_stack: ndarray
+            The registered stack to the reference frame.
+        [row_list]: list, optional
+            The list of row shifts for all frames.
+        [col_list]: list, optional
+            The list of col shifts for all frames.
+    """
     reg_stack = np.zeros(stack.shape, dtype=stack.dtype)
     
     # Compute the stack to process, and reference image

@@ -9,7 +9,7 @@ Created on Mon Oct  1 17:48:29 2018
 
 import numpy as np
 from scipy import ndimage as ndi
-from skimage import filters, io, color
+from skimage import filters, io, color, measure
 from skimage import morphology as morph
 from skimage.morphology import square, disk, diamond
 
@@ -135,7 +135,7 @@ def hysteresis_threshold(image, low, high):
 
 # Loss/metrics for comparing predictions with ground truths
 def loss_mae(predictions, targets, reduction='mean'):
-    """Compute the Mean Average Error between predictions and targets."""
+    """Compute the (Mean) Average Error between predictions and targets."""
     if reduction in ["mean", "ave", "average"]:
         return np.abs(targets[:] - predictions[:]).mean()
     elif reduction in ["sum"]:
@@ -144,7 +144,7 @@ def loss_mae(predictions, targets, reduction='mean'):
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
 def loss_l2_segmentation(predictions, targets, reduction='mean'):
-    """Compute the average L2-norm loss between predicted and target ROI segmentations."""
+    """Compute the L2-norm loss between predicted and target ROI segmentations."""
     loss = 0.0
     for i in range(len(targets)):
         loss += np.linalg.norm(targets[i] - predictions[i])
@@ -157,11 +157,46 @@ def loss_l2_segmentation(predictions, targets, reduction='mean'):
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
 def dice_coef(predictions, targets, reduction='mean'):
-    """Compute the average Dice coefficient between predicted and target ROI segmentations."""
+    """Compute the Dice coefficient between predicted and target ROI segmentations."""
     loss = 0.0
     for i in range(len(targets)):
-        loss += 2.0 * np.logical_and(targets[i], predictions[i]).sum() / \
-            (targets[i].sum() + predictions[i].sum())
+        total_pos = targets[i].sum() + predictions[i].sum()
+        if total_pos == 0: # No true positive, and no false positive --> correct
+            loss += 1.0
+        else:
+            loss += 2.0 * np.logical_and(targets[i], predictions[i]).sum() / total_pos
+    
+    if reduction in ["mean", "ave", "average"]:
+        return loss / len(targets)
+    elif reduction in ["sum"]:
+        return loss
+    else:
+        raise ValueError("""Unknown reduction method "%s".""" % reduction)
+
+def crop_dice_coef(predictions, targets, scale=4.0, reduction='mean'):
+    """Compute the Dice coefficient around  the cropped targets' ROI.
+    
+    Height and width of the ROI cropping will be increased by scale.
+    """
+    loss = 0.0
+    for i in range(len(targets)):
+        labels = measure.label(targets[i])
+        regionprops = measure.regionprops(labels)
+        # Loop over target ROI
+        for region in regionprops:
+            min_row, min_col, max_row, max_col = region.bbox
+            height = max_row - min_row
+            width = max_col - min_col
+            max_row = int(min(targets[i].shape[0], max_row + height * (scale-1) / 2))
+            min_row = int(max(0, min_row - height * (scale-1) / 2))
+            max_col = int(min(targets[i].shape[1], max_col + width * (scale-1) / 2))
+            min_col = int(max(0, min_col - width * (scale-1) / 2))
+            
+            loss += 2.0 * np.logical_and(targets[i][min_row:max_row, min_col:max_col],
+                                         predictions[i][min_row:max_row, min_col:max_col]).sum() / \
+                    (targets[i][min_row:max_row, min_col:max_col].sum() + \
+                     predictions[i][min_row:max_row, min_col:max_col].sum()) / \
+                    len(regionprops) # Averaging factor for multiple ROI in same image
     
     if reduction in ["mean", "ave", "average"]:
         return loss / len(targets)

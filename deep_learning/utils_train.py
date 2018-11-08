@@ -14,37 +14,51 @@ import torch
 
 
 def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
-          criterion_metric="", model_dir=None, replace_dir=True, verbose=1):
+          criterion_metric="loss", model_dir=None, replace_dir=True, verbose=1):
     """
     Train the model, and return the best found, as well as the training history.
     
     Args:
-        model: the PyTorch model
-        dataloaders (dict): contains the train and validation DataLoaders with
-            respective keys "train" and "valid"
-        loss_fn (callable): the PyTorch loss function. Should take 2 tensors in 
-            (predictions and targets), and output a tensor
-        optimizer: the PyTorch optimizer
-        n_epochs (int): number of epochs (pass over the total data)
-        metrics (dict): dict of metrics to compute over the data. Should take 
-            2 tensors in (predictions and targets), and output a tensor
-        criterion_metric(str): key of the metric to use for early stopping
-            (can be "loss")
-        model_dir (str): path of the folder in which the best model is saved.
+        model: PyTorch model
+            The model, based on Torch.nn.Module. It should have a `device` 
+            attribute.
+        dataloaders: dict of dataloaders
+            Contains the train and validation DataLoaders with respective keys 
+            "train" and "valid".
+        loss_fn: callable
+            The PyTorch loss function. It should take 2 tensors as input
+            (predictions and targets), and output a scalar tensor
+        optimizer: PyTorch optimizer
+            Optimzer for the SGD algorithm.
+        n_epochs: int
+            Number of epochs (pass over the whole data).
+        metrics: dict of callable
+            Dictionary of metrics to be computed over the data. It should take 
+            2 tensors as input (predictions and targets), and output a scalar 
+            tensor. Keys should be their name, value the callable.
+        criterion_metric: str (default = "loss")
+            Name of the metric to use for early stopping. It can be "loss", in
+            this case, it is based on the highest negative loss. Otherwise, it
+            should be the same as the key in the `metrics` dictionary.
+            Note that it is automatically based on the validation set.
+        model_dir: str (default = None)
+            Directory/path of the folder in which the best model is saved.
             If None, the model won't be saved.
-        replace_dir (bool): If True and model_dir is already existing, it will
-            be over-written
-        verbose (int): verbosity of the function (0 is silent)
+        replace_dir: bool (default = True)
+            If True and model_dir is already existing, it will be over-written.
+        verbose: int (default = 1)
+            Verbosity of the function (0 means silent).
     
     Returns:
-        best_model: the best model found, based on validation metrics[criterion_metric] 
-            or negative of loss if no metrics given or if criterion_metric == "loss"
-        history: a dictionary with the training history. Validation keys
-            are like train keys with a preceding "val_"
+        best_model: PyTorch model
+            The best model found, i.e. corresponding to the epoch where the 
+            validation metrics[criterion_metric] (or negative loss) is the highest.
+        history: dict
+            Dictionary with the training history. Validation keys are like 
+            their training counterparts, with the prefix "val_".
     """
-    best_val_criterion = - np.inf
-    if not metrics:
-        criterion_metric = "loss"
+    best_val_criterion = -np.inf
+    best_epoch = -1
     
     # If no model folder for saving, create a temporary one
     if model_dir is None:
@@ -144,6 +158,7 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
         
         if criterion_val > best_val_criterion:
             best_val_criterion = criterion_val
+            best_epoch = epoch
             # Save model state dict
             torch.save(model.state_dict(), os.path.join(save_dir, "model_best.pt"))
         
@@ -154,7 +169,15 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
         duration = time.time() - start_time
         duration_msg = "{:.0f}h {:02.0f}min {:02.0f}s".format(duration // 3600, (duration // 60) % 60, duration % 60)
         print("Training took %s." % duration_msg)
-        print("Best validation {} = {:.3f}".format(criterion_metric, best_val_criterion))
+        print("Best validation {} = {:.3f} at epoch {}.".format(
+                criterion_metric, best_val_criterion, best_epoch + 1))
+        print("According validation loss = {:.3f}".format(history["val_loss"][best_epoch]),
+              end="")
+        for key in metrics.keys():
+            if key == criterion_metric:
+                continue
+            print(" - {} = {:.3f}".format(key, history["val_"+key][best_epoch]), end="")
+        print()
     
     # Load best model, and remove tmpdir if applicable
     best_model = copy.deepcopy(model)

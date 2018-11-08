@@ -15,8 +15,11 @@ import torch, torchvision
 from utils_data import make_images_valid
 
 
-def predict(model, dataloader, post_processing=None, discard_target=True):
-    """Output predictions for the given dataloader and model."""
+def predict(model, dataloader, discard_target=True):
+    """Output predictions for the given dataloader and model.
+    
+    `discard_target` can be used if the dataloader return batches as 
+    (inputs, targets) tuples."""
     predictions = []
     
     # Compute predictions
@@ -29,15 +32,13 @@ def predict(model, dataloader, post_processing=None, discard_target=True):
             batch = batch.to(model.device)
             predictions.append(model(batch))
     
-    # Post-process them
+    # Concatenate everything together
     predictions = torch.cat(predictions)
-    if post_processing is not None:
-        predictions = post_processing(predictions)
     return predictions
     
     
 def evaluate(model, dataloader, metrics):
-    """Return the metric values for the given data and model."""
+    """Return the metric values for the given dataloader and model."""
     values = {}
     for key in metrics.keys():
         values[key] = 0
@@ -60,7 +61,24 @@ def evaluate(model, dataloader, metrics):
 
 
 def show_sample(model, dataloader, n_samples=4, post_processing=None, metrics=None):
-    """Display sample images of some inputs, predictions, and targets."""
+    """
+    Display a random sample of some inputs, predictions, and targets.
+    
+    Args:
+        model: PyTorch model
+            The model, based on Torch.nn.Module. It should have a `device` 
+            attribute.
+        dataloader: PyTorch DataLoader
+            The data will be sampled from the DataLoader's dataset.
+        n_samples: int (default = 4)
+            Number of images in the random sampling.
+        post_processing: callable (default = None)
+            Post processing function to apply to the predictions before visualization.
+        metrics: dict of callable
+            Dictionary of metrics to be computed over the samples. It should 
+            take 2 tensors as input (predictions and targets), and output a 
+            scalar tensor.
+    """
     indices = np.random.randint(0, len(dataloader.dataset), n_samples)
     
     inputs = torch.stack([torch.from_numpy(dataloader.dataset[i][0]) for i in indices])
@@ -86,10 +104,12 @@ def show_sample(model, dataloader, n_samples=4, post_processing=None, metrics=No
     
     if metrics is not None:
         for i, idx in enumerate(indices):
-            print("Image %d: " % idx, end="")
+            print("Image % 6d: " % idx, end="")
             for key in metrics.keys():
-                print("{} = {:.6}; ".format(key, metrics[key](preds[i].unsqueeze(0), 
-                                                              targets[i].unsqueeze(0))))
+                print("{} = {:.6f} - ".format(key, metrics[key](preds[i].unsqueeze(0), 
+                                                              targets[i].unsqueeze(0))),
+                      end="")
+            print()
         
     plt.figure(figsize=(12,10))
     plt.subplot(311); plt.title("Inputs")

@@ -31,6 +31,7 @@ def weights_initialization(model):
 
 
 #class CustomNet(torch.nn.Module):
+#    """Definition of a custom written model."""
 #    def __init__(self, shape, activation=torch.nn.ReLU, device=torch.device("cpu")):
 #        """Initialize the model."""
 #        super(CustomNet, self).__init__()
@@ -126,10 +127,37 @@ class UNetUpConv(torch.nn.Module):
    
 
 class CustomUNet(torch.nn.Module):
-    def __init__(self, in_channels, out1_channels=8, u_depth=1,
-                 activation=torch.nn.ReLU(), batchnorm=False,
+    """
+    Definition of a U-Net like network. 
+    
+    NB: Depth and initial number of channels are tunable, zero-padding is used
+    so that input and output are of the same size, optional batch normalization
+    layers.
+    
+    Args:
+        in_channels: int
+            Number of channels of the input images.
+        u_depth: int (default = 1)
+            Depth of the network's U-shape (should be > 0). I.e., there will
+            be `u_depth` MaxPooling, and `u_depth` transposed convolutions.
+        out1_channels: int (default = 8)
+            Number of output channels after the first convolutional block.
+            Note that after this, each ConvBlock doubles the channels, and
+            each UpConvBlock halves the channels.
+        activation: PyTorch activation function (default = torch.nn.ReLU())
+            The non-linear activation to apply after each convolution.
+            Note that with the current implementation, this one is reused 
+            everywhere. Therefore, it cannot have any learnable parameters.
+        batchnorm: bool (default = True)
+            If True, the network will have a batch normalization layer after
+            each convolution (and after the non-linearity).
+        device: PyTorch device (default = torch.device("cpu"))
+            Device to which the model is to be placed
+    """
+    def __init__(self, in_channels, u_depth=1, out1_channels=8,
+                 activation=torch.nn.ReLU(), batchnorm=True,
                  device=torch.device("cpu")):
-        """Initialize the model."""
+        """Initialize the model (see class docstring for arguments description)."""
         super(CustomUNet, self).__init__()
         self.in_channels = in_channels
         self.activation = activation
@@ -179,7 +207,8 @@ class CustomUNet(torch.nn.Module):
         return logits
     
     def to(self, *args, **kwargs):
-        """Modifiy model.device and call Module.to()."""
+        """Send the model to the device, and modify accordingly its `device` attribute."""
+        output = super(CustomUNet, self).to(*args, **kwargs)
         device, _, _ = torch._C._nn._parse_to(*args, **kwargs)
         self.device = device
-        return super(CustomUNet, self).to(*args, **kwargs)
+        return output
