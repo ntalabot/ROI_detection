@@ -13,12 +13,11 @@ import random
 
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage import io
 
 import torch
 
-from utils_common.ROI_detection import dice_coef
-from utils_data import ImageLoaderDataset, get_filenames, get_dataloaders
+from utils_common.ROI_detection import dice_coef, crop_dice_coef
+from utils_data import get_all_dataloaders
 from utils_model import CustomUNet
 from utils_train import train
 from utils_test import evaluate
@@ -43,61 +42,57 @@ def main(args, model=None):
     if args.verbose:
         print("Device set to '{}'.".format(device))
         
-    ## Data preparation
-    # Create lists of filenames
-    x_train, y_train = get_filenames(os.path.join(args.data_dir, "train/"))
-    if args.no_test:
-        pass
-    else:
-        x_test, y_test = get_filenames(os.path.join(args.data_dir, "test/"))
-    
+    ## Data preparation    
     # Create dataloaders
-    dataloaders = get_dataloaders(x_train, y_train, args.train_ratio, args.batch_size,
-                                  input_channels = args.input_channels,
-                                  train_transform = None,  valid_transform = None)
-    if args.no_test:
-        pass
-    else:
-        test_loader = torch.utils.data.DataLoader(
-                ImageLoaderDataset(x_test, y_test, input_channels=args.input_channels, 
-                                   transform=None, target_transform=None),
-                batch_size=args.batch_size, shuffle=False, num_workers=1)
+    dataloaders = get_all_dataloaders(
+        args.data_dir, 
+        args.batch_size, 
+        input_channels = args.input_channels, 
+        test_dataloader = args.eval_test,
+        train_transform = None, train_target_transform = None,
+        eval_transform = None, eval_target_transform = None
+    )
     
     N_TRAIN = len(dataloaders["train"].dataset)
     N_VALID = len(dataloaders["valid"].dataset)
-    if args.no_test:
-        pass
-    else:
-        N_TEST = len(test_loader.dataset)
-    HEIGHT, WIDTH = io.imread(x_train[0]).shape[:2]
+    if args.eval_test:
+        N_TEST = len(dataloaders["test"].dataset)
     # Positive class weight (pre-computed)
     pos_weight = torch.tensor(120.946829).to(device)
     
     if args.verbose:
-        print("{:.3f} positive weighting.".format(pos_weight.item()))
-        print("%d train images of size %dx%d (%d to train, %d to validation)." % \
-              (len(x_train), HEIGHT, WIDTH, N_TRAIN, N_VALID))
-        if args.no_test:
-            pass
-        else:
+        print("%d train images." % N_TRAIN)
+        print("%d validation images." % N_VALID)
+        if args.eval_test:
             print("%d test images." % N_TEST)
+        print("{:.3f} positive weighting.".format(pos_weight.item()))
     
     ## Model, loss, and optimizer definition
     if model is None:
-        model = CustomUNet(len(args.input_channels), batchnorm=False, device=device)
+        model = CustomUNet(len(args.input_channels), u_depth=1,
+                           out1_channels=8, batchnorm=True, device=device)
         if args.model_dir is not None:
             # Save the "architecture" of the model by copy/pasting the class definition file
             os.makedirs(os.path.join(args.model_dir), exist_ok=True)
             shutil.copy("utils_model.py", os.path.join(args.model_dir, "utils_model_save.py"))
-    else:
+    # make sure the given model is on the correct device
+    else: 
         model.to(device)
         
     if args.verbose:
         print("\nModel definition:", model, "\n")
     
     loss_fn = torch.nn.BCEWithLogitsLoss(reduction='elementwise_mean', pos_weight=pos_weight)
-    dice_metric = lambda preds, targets: torch.tensor(dice_coef((torch.sigmoid(preds.cpu()) > 0.5).detach().numpy(),
-                                                                targets.cpu().detach().numpy()))
+    
+    dice_metric = lambda preds, targets: torch.tensor(
+            dice_coef((torch.sigmoid(preds.cpu()) > 0.5).detach().numpy(),
+                      targets.cpu().detach().numpy()))
+    
+    diceC_metric = lambda preds, targets: torch.tensor(
+        crop_dice_coef((torch.sigmoid(preds.cpu()) > 0.5).detach().numpy(),
+                       targets.cpu().detach().numpy(),
+                       scale = args.scale_dice))
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     
     ## Train the model
@@ -106,7 +101,8 @@ def main(args, model=None):
                                 loss_fn,
                                 optimizer,
                                 args.epochs,
-                                metrics = {"dice": dice_metric},
+                                metrics = {"dice": dice_metric, 
+                                           "diC%.1f" % args.scale_dice: diceC_metric},
                                 criterion_metric = "dice",
                                 model_dir = args.model_dir,
                                 replace_dir = True,
@@ -115,28 +111,39 @@ def main(args, model=None):
     ## Save a figure if applicable
     if args.save_fig and args.model_dir is not None:
         fig = plt.figure(figsize=(12,6))
-        plt.subplot(121)
+        plt.subplot(131)
         plt.title("Loss")
         plt.plot(history["epoch"], history["loss"])
         plt.plot(history["epoch"], history["val_loss"])
-        plt.xlabel("Epoch"); plt.ylabel("Loss")
-        plt.legend(["train loss", "valid. loss"])
-        plt.subplot(122)
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.legend(["train loss", "valid loss"])
+        plt.subplot(132)
         plt.title("Dice coefficient")
         plt.plot(history["epoch"], history["dice"])
         plt.plot(history["epoch"], history["val_dice"])
-        plt.xlabel("Epoch"); plt.ylabel("Dice coef.")
-        plt.legend(["train dice", "valid. dice"])
+        plt.xlabel("Epoch")
+        plt.ylabel("Dice coef.")
+        plt.legend(["train dice", "valid dice"])
+        plt.subplot(133)
+        plt.title("Cropped Dice coefficient (scale = %.1f)" % args.scale_dice)
+        plt.plot(history["epoch"], history["diC%.1f" % args.scale_dice])
+        plt.plot(history["epoch"], history["val_diC%.1f" % args.scale_dice])
+        plt.xlabel("Epoch")
+        plt.ylabel("Cropped Dice coef.")
+        plt.legend(["train diC%.1f" % args.scale_dice, "valid diC%.1f" % args.scale_dice])
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         fig.savefig(os.path.join(args.model_dir, "train_fig.png"), dpi=400)
        
     ## Evaluate best model over test data
-    if args.no_test:
-        pass
-    else:
-        test_metrics = evaluate(best_model, test_loader, {"loss": loss_fn, "dice": dice_metric})
+    if args.eval_test:
+        test_metrics = evaluate(best_model, dataloaders["test"], 
+                                {"loss": loss_fn, "dice": dice_metric,
+                                 "diC%.1f" % args.scale_dice: diceC_metric})
         if args.verbose:
-            print("\nTest loss = {}\nTest dice = {}".format(test_metrics["loss"], test_metrics["dice"]))
+            print("\nTest loss = {}".format(test_metrics["loss"]))
+            print("Test dice = {}".format(test_metrics["dice"]))
+            print("Crop dice = {}".format(test_metrics["diC%.1f" % args.scale_dice]))
         
     ## Display script duration if applicable
     if args.timeit:
@@ -144,13 +151,13 @@ def main(args, model=None):
         duration_msg = "{:.0f}h {:02.0f}min {:02.0f}s".format(duration // 3600, (duration // 60) % 60, duration % 60)
         print("\nScript took %s." % duration_msg)
         
-    # If model was evaluated on test data, return the best metric values
-    # This is useless in this script, but allow this function to be reused 
-    # somewhere else, e.g. for the gridsearch.
-    if args.no_test:
-        return
+    # If model was evaluated on test data, return the best metric values, and 
+    # return in any case the history. This is useless in this script, but allow 
+    # this function to be reused somewhere else, e.g. for the gridsearch.
+    if args.eval_test:
+        return history, test_metrics
     else:
-        return test_metrics
+        return history
 
 
 if __name__ == "__main__":
@@ -165,17 +172,22 @@ if __name__ == "__main__":
             '--data_dir',
             type=str,
             default="../dataset/", 
-            help="directory to the train and test data. It should contain "
-            "train/ and test/ subdirs (test/ is not mandatory, see --no_test). "
+            help="directory to the train, validation, and test data. It should contain "
+            "train/, validation/, and test/ subdirs (test/ is not mandatory, see --eval_test). "
             "These should be structured as: "
-            "train or test_dir-->subdirs-->rgb_frames: folder with input images; and "
-            "train or test_dir-->subdirs-->seg_frames: folder with target images (default=../dataset/)"
+            "train_dir-->subdirs-->rgb_frames: folder with input images; and "
+            "train_dir-->subdirs-->seg_frames: folder with target images (default=../dataset/)"
     )
     parser.add_argument(
             '--epochs', 
             type=int,
             default=5, 
             help="number of epochs (default=5)"
+    )
+    parser.add_argument(
+            '--eval_test', 
+            action="store_true",
+            help="perform a final evaluation over the test data"
     )
     parser.add_argument(
             '--input_channels', 
@@ -195,11 +207,6 @@ if __name__ == "__main__":
             help="directory where the model is to be saved (if not set, the model won't be saved)"
     )
     parser.add_argument(
-            '--no_test', 
-            action="store_true",
-            help="disable final evaluation over the test data (use this if you have no test data)"
-    )
-    parser.add_argument(
             '--no_gpu', 
             action="store_true",
             help="disable gpu utilization (not needed if no gpu are available)"
@@ -211,16 +218,17 @@ if __name__ == "__main__":
             "(requires the --model_dir argument to be set)"
     )
     parser.add_argument(
+            '--scale_dice', 
+            type=float,
+            default=4.0,
+            help="scaling of the cropping (w.r.t. ROI's bounding box) for "
+            "the cropped dice coef. (default=4.0)"
+    )
+    parser.add_argument(
             '--seed', 
             type=int,
             default=1,
             help="initial seed for RNG (default=1)"
-    )
-    parser.add_argument(
-            '--train_ratio',
-            type=float,
-            default=0.8,
-            help="percentage of train data actually going to training vs. validation (default=0.8)"
     )
     parser.add_argument(
             '-t', '--timeit', 
