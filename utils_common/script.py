@@ -10,7 +10,7 @@ Created on Thu Nov  1 16:03:09 2018
 class Arguments:
     """Container object that stores arguments through its attributes.
     
-    Useful for simulating arguments passed through command line to a script."""
+    Useful for simulating command line arguments passed to a script."""
     
     def __init__(self, **kwargs):
         """Create attributes equivalent to keyword arguments."""
