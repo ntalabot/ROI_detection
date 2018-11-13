@@ -112,7 +112,7 @@ def get_filenames(data_dir, valid_extensions=('.png', '.jpg', '.jpeg')):
     return x_filenames, y_filenames
 
 
-def get_dataloader(data_dir, batch_size, input_channels="RG", shuffle=True,
+def get_dataloader(data_dir, batch_size, input_channels="R", shuffle=True,
                    transform=None, target_transform=None, num_workers=1):
     """
     Return a dataloader with the data in the given directory.
@@ -122,7 +122,7 @@ def get_dataloader(data_dir, batch_size, input_channels="RG", shuffle=True,
             Directory/path to the data (see get_filenames() for the structure).
         batch_size: int
             Number of samples to return as a batch.
-        input_channels: str (default = "RG")
+        input_channels: str (default = "R")
             Indicates the channels to load from the input images, e.g. "RG"
             for Red and Green.
         shuffle: bool (default = True)
@@ -140,7 +140,7 @@ def get_dataloader(data_dir, batch_size, input_channels="RG", shuffle=True,
     return data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
 
 
-def get_all_dataloaders(data_dir, batch_size, input_channels="RG", test_dataloader=False,
+def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloader=False,
                         train_transform=None, train_target_transform=None,
                         eval_transform=None, eval_target_transform=None):
     """
@@ -152,7 +152,7 @@ def get_all_dataloaders(data_dir, batch_size, input_channels="RG", test_dataload
             and (optional) "test/" subdirs (see get_filenames() for their structure).
         batch_size: int
             Number of samples to return as a batch.
-        input_channels: str (default = "RG")
+        input_channels: str (default = "R")
             Indicates the channels to load from the input images, e.g. "RG"
             for Red and Green.
         test_dataloader: bool (default = False)

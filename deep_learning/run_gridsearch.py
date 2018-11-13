@@ -19,7 +19,7 @@ n_epochs = 10
 u_depths = [4]
 out1_channels = [32]
 learning_rates = [1e-2]
-batch_sizes = [16, 32, 64]
+batch_sizes = [16]
 
 def main():
     print("Starting on %s\n\nResults over validation data (%d epochs):" % (time.ctime(), n_epochs))

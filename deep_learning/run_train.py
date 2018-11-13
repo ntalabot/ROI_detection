@@ -194,8 +194,8 @@ if __name__ == "__main__":
     parser.add_argument(
             '--input_channels', 
             type=str,
-            default="RG", 
-            help="channels of RGB input images to use (default=RG)"
+            default="R", 
+            help="channels of RGB input images to use (default=R)"
     )
     parser.add_argument(
             '--learning_rate', 

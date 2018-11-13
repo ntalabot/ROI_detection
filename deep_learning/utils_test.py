@@ -37,7 +37,7 @@ def predict(model, dataloader, discard_target=True):
     predictions = torch.cat(predictions)
     return predictions
     
-def predict_stack(model, stack, batch_size, input_channels="RG"):
+def predict_stack(model, stack, batch_size, input_channels="R"):
     """Output predictions for the given image stack and model.
     
     `stack` can either be the filename (`input_channels` is then required),
