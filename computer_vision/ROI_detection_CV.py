@@ -14,17 +14,16 @@ from scipy import ndimage as ndi
 from skimage import measure, io, feature, color, filters
 from skimage import morphology as morph
 
-import utils_common.ROI_detection as roi
-import utils_common.register_CC as reg
+from utils_common.image import imread_to_float, overlay_mask_stack, to_npint
+from utils_common.processing import preprocess_stack
+from utils_common.metrics import dice_coef, crop_dice_coef
+import utils_common.register_cc as reg
 
 def main(args):
     # Parameters
-    if args.num_peaks == -1:
-        args.num_peaks = np.inf
-    
     datadir = "../dataset/validation/"
     result_dir = "results_CV/"
-    channels_to_process = [0,1] # R,G,B <--> 0,1,2
+    channels_to_process = [0] # R,G,B <--> 0,1,2
     scale_dice = 4.0 # scale of the cropping (w.r.t. ROI's bounding box) for cropped dice
     
     os.makedirs(result_dir, exist_ok=True)
@@ -36,23 +35,27 @@ def main(args):
     for folder_num, subdir in enumerate(data_dirs):
         print("Starting processing folder %d/%d." % (folder_num + 1, len(data_dirs)))
         # Load stacks
-        rgb_stack = roi.imread_to_float(os.path.join(datadir, subdir, "RGB.tif"))
+        rgb_stack = imread_to_float(os.path.join(datadir, subdir, "RGB.tif"))
         stack = np.zeros(rgb_stack.shape[:-1], dtype=rgb_stack.dtype)
         for channel in channels_to_process:
             stack += rgb_stack[:,:,:,channel] / len(channels_to_process)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            stack_pp = roi.preprocess_stack(stack)
-        reg_stack, rows, cols = reg.register_stack(stack_pp, return_shifts=True)
+            stack_pp = preprocess_stack(stack)
         
-        # Find centroids on mean temporal image
-        mean_img = reg_stack.mean(axis=0)
-        mean_pp = filters.gaussian(mean_img, 3, truncate=4)
-        mean_bin = roi.hysteresis_threshold(mean_pp, mean_pp.mean(), 
-                                            mean_pp.max() * args.threshold_rel)
-        peaks = feature.peak_local_max(mean_pp, footprint=np.ones((11,11)), 
-                                       threshold_rel=args.threshold_rel,
-                                       labels=mean_bin, num_peaks=args.num_peaks)
+        # Compute number of ROI if unknown
+        if args.num_peaks == -1:
+            reg_stack, rows, cols = reg.register_stack(stack_pp, return_shifts=True)
+            
+            # Find centroids on mean temporal image
+            mean_img = reg_stack.mean(axis=0)
+            mean_pp = filters.gaussian(mean_img, 3, truncate=4)
+            mean_bin = filters.apply_hysteresis_threshold(mean_pp, mean_pp.mean(), 
+                                                          mean_pp.max() * args.threshold_rel)
+            peaks = feature.peak_local_max(mean_pp, footprint=np.ones((11,11)), 
+                                           threshold_rel=args.threshold_rel,
+                                           labels=mean_bin)
+            args.num_peaks = peaks.shape[0]
         
         # Segment ROI by looping through images
         seg_ROI = np.zeros(stack_pp.shape, dtype=np.bool)
@@ -64,23 +67,20 @@ def main(args):
                 img = stack_pp[i]
                 img = filters.gaussian(img, 3, truncate=4)
                 
-                # Shift the centroids back into un-registered stack
-                peaks_shifted = np.zeros(peaks.shape, dtype=peaks.dtype)
-                for peak_num in range(peaks.shape[0]):
-                    peaks_shifted[peak_num,:] = peaks[peak_num,:] - np.array([rows[i], cols[i]])
-                    # Make sure they are in the image
-                    peaks_shifted[peak_num,0] %= img.shape[0] 
-                    peaks_shifted[peak_num,1] %= img.shape[1] 
+                # Find the centroids location on the image
+                peaks = feature.peak_local_max(
+                    img, footprint=np.ones((11,11)), threshold_rel=args.threshold_rel,
+                    labels=mean_bin, num_peaks=args.num_peaks) 
                 
-                for j in range(peaks_shifted.shape[0]):
-                    peak_ROI[i, peaks_shifted[j,0], peaks_shifted[j,1]] = True
+                for j in range(peaks.shape[0]):
+                    peak_ROI[i, peaks[j,0], peaks[j,1]] = True
                     
                 # Segment the ROI by thresholding locally (keep closest region 
                 # to each centroid)
                 img_bin = np.zeros(img.shape, dtype=np.bool)
-                for j in range(peaks_shifted.shape[0]):
+                for j in range(peaks.shape[0]):
                     # Threshold by centroid's value (with img.mean as minimum)
-                    c_row, c_col = peaks_shifted[j]
+                    c_row, c_col = peaks[j]
                     local_bin = img > max(img[c_row, c_col] * args.threshold_rel_peak, 
                                           img.mean())
                     # Keep only the region with the centroid
@@ -92,7 +92,7 @@ def main(args):
                         closest_label = -1
                         closest_dist = np.inf
                         for region in measure.regionprops(local_labels):
-                            dist = ((region.coords - peaks_shifted[j]) ** 2).sum(axis=1).min()
+                            dist = ((region.coords - peaks[j]) ** 2).sum(axis=1).min()
                             if dist < closest_dist:
                                 closest_dist = dist
                                 closest_label = region.label
@@ -105,27 +105,27 @@ def main(args):
 #                # Segment individual ROI with their centroid
 #                img_dist = ndi.distance_transform_edt(img_bin)
 #                local_maxi = feature.peak_local_max(img_dist, indices=False, footprint=np.ones((3,3)),
-#                                                    labels=img_bin, num_peaks=peaks_shifted.shape[0])
+#                                                    labels=img_bin, num_peaks=peaks.shape[0])
 #                markers = measure.label(local_maxi)[0] # local_maxi/peak_ROI
 #                img_labels = morph.watershed(-img_dist, markers, mask=img_bin) # img_pp/img_dist
                 
                 # Put results into the variables
                 seg_ROI[i] = img_bin
                 peak_ROI[i] = morph.dilation(peak_ROI[i])
-                centroids.append(peaks_shifted)
+                centroids.append(peaks)
         
         # Create the overlay
-        overlay_ROI = roi.overlay_mask_stack(rgb_stack.copy(), seg_ROI, opacity=0.25,
+        overlay_ROI = overlay_mask_stack(rgb_stack.copy(), seg_ROI, opacity=0.25,
                                              mask_color=[0.0, 0.0, 1.0])
-        overlay_ROI = roi.overlay_mask_stack(overlay_ROI, peak_ROI, opacity=1.0,
+        overlay_ROI = overlay_mask_stack(overlay_ROI, peak_ROI, opacity=1.0,
                                                mask_color=[1.0, 1.0, 0.0])
         
         # Save results and disable warnings about low contrast
         os.makedirs(os.path.join(result_dir, subdir), exist_ok=True)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            io.imsave(os.path.join(result_dir, subdir, "seg_ROI.tif"), roi.to_npint(seg_ROI, dtype=np.uint8))
-            io.imsave(os.path.join(result_dir, subdir, "overlay_ROI.tif"), roi.to_npint(overlay_ROI, dtype=np.uint16))
+            io.imsave(os.path.join(result_dir, subdir, "seg_ROI.tif"), to_npint(seg_ROI, dtype=np.uint8))
+            io.imsave(os.path.join(result_dir, subdir, "overlay_ROI.tif"), to_npint(overlay_ROI, dtype=np.uint16))
         with open(os.path.join(result_dir, subdir, "centroids.pkl"), 'wb') as file:
             pickle.dump(centroids, file)
         
@@ -135,8 +135,8 @@ def main(args):
 #        with open(os.path.join(datadir, subdir, "centroids.pkl"), 'rb') as file:
 #            gt_centroids = pickle.load(file)
         # Compute losses
-        losses_dice.append(roi.dice_coef(seg_ROI, gt_seg_ROI, reduction='sum'))
-        losses_diC.append(roi.crop_dice_coef(seg_ROI, gt_seg_ROI, scale=scale_dice, reduction='sum'))
+        losses_dice.append(dice_coef(seg_ROI, gt_seg_ROI, reduction='sum'))
+        losses_diC.append(crop_dice_coef(seg_ROI, gt_seg_ROI, scale=scale_dice, reduction='sum'))
         
         image_counter += len(stack)
     
@@ -149,18 +149,19 @@ def main(args):
    
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Apply ROI detection with compute vision to the data.")
+    parser = argparse.ArgumentParser(description="Detect ROI with computer vision in the data.")
     parser.add_argument(
             '--threshold_rel', 
             type=float,
             default=0.3, 
-            help="relative threshold for centroid detection (default=0.3)"
+            help="relative threshold for detecting centroid numbers. "
+            "Unused if num_peaks != -1 (default=0.3)"
     )
     parser.add_argument(
             '--threshold_rel_peak', 
             type=float,
-            default=0.3, 
-            help="relative threshold for ROI segmentation (default=0.3)"
+            default=0.36, 
+            help="relative threshold for ROI segmentation (default=0.36)"
     )
     parser.add_argument(
             '--num_peaks', 
