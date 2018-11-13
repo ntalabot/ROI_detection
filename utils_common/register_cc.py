@@ -14,6 +14,9 @@ def _compute_shifts(ref_image, shifted_image, return_error=False):
     """
     Compute and return the row and column shifts between the reference and shifted images.
     
+    Note that shift are going from `shifted_image` to `ref_image`, i.e. shifting
+    `shifted_image` by row and col shifts will give back `ref_image`.
+    
     Args:
         ref_image: ndarray
             Reference image for the shifts computation, it should be 

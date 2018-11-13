@@ -6,6 +6,7 @@ Created on Mon Nov 12 09:28:07 2018
 
 @author: nicolas
 """
+
 import warnings
 import numpy as np
 from skimage import filters
