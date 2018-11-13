@@ -160,7 +160,7 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
             best_val_criterion = criterion_val
             best_epoch = epoch
             # Save model state dict
-            torch.save(model.state_dict(), os.path.join(save_dir, "model_best.pt"))
+            torch.save(model.state_dict(), os.path.join(save_dir, "model_best.pth"))
         
         if verbose:
             print()
@@ -181,7 +181,7 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
     
     # Load best model, and remove tmpdir if applicable
     best_model = copy.deepcopy(model)
-    best_model.load_state_dict(torch.load(os.path.join(save_dir, "model_best.pt")))
+    best_model.load_state_dict(torch.load(os.path.join(save_dir, "model_best.pth")))
     if model_dir is None:
         shutil.rmtree(save_dir)
     

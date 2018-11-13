@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import torch, torchvision
 
 from utils_data import make_images_valid
+from utils_common.image import imread_to_float
 
 
 def predict(model, dataloader, discard_target=True):
@@ -36,7 +37,36 @@ def predict(model, dataloader, discard_target=True):
     predictions = torch.cat(predictions)
     return predictions
     
+def predict_stack(model, stack, batch_size, input_channels="RG"):
+    """Output predictions for the given image stack and model.
     
+    `stack` can either be the filename (`input_channels` is then required),
+    or an ndarray/tensor."""
+    # Make sure stack is in the correct shape
+    if isinstance(stack, str):
+        stack = imread_to_float(stack, scaling=255)
+        channels = {"R": stack[...,0], "G": stack[...,1], "B": stack[...,2]}
+        stack = np.stack([channels[channel] for channel in input_channels], axis=0)
+    elif isinstance(stack, np.ndarray):
+        stack = torch.from_numpy(stack)
+    else:
+        raise TypeError("Unknown type %s for the image stack." % type(stack))
+    
+    predictions = []
+    
+    # Compute predictions
+    model.eval()
+    with torch.no_grad():
+        for i in range(int(np.ceil(len(stack) / batch_size))):
+            batch = stack[i * batch_size: (i + 1) * batch_size]
+            batch = batch.to(model.device)
+            predictions.append(model(batch))
+    
+    # Concatenate everything together
+    predictions = torch.cat(predictions)
+    return predictions
+
+
 def evaluate(model, dataloader, metrics):
     """Return the metric values for the given dataloader and model."""
     values = {}
@@ -109,7 +139,7 @@ def show_sample(model, dataloader, n_samples=4, post_processing=None, metrics=No
                 print("{} = {:.6f} - ".format(key, metrics[key](preds[i].unsqueeze(0), 
                                                               targets[i].unsqueeze(0))),
                       end="")
-            print()
+            print("\b\b")
         
     plt.figure(figsize=(12,10))
     plt.subplot(311); plt.title("Inputs")

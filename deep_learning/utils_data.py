@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from torch.utils import data
 
-from utils_common.ROI_detection import imread_to_float
+from utils_common.image import imread_to_float
 
 
 class ImageLoaderDataset(data.Dataset):

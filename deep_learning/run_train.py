@@ -12,11 +12,13 @@ import argparse
 import random
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import torch
 
-from utils_common.ROI_detection import dice_coef, crop_dice_coef
+from utils_common.metrics import dice_coef, crop_dice_coef
 from utils_data import get_all_dataloaders
 from utils_model import CustomUNet
 from utils_train import train
@@ -69,8 +71,8 @@ def main(args, model=None):
     
     ## Model, loss, and optimizer definition
     if model is None:
-        model = CustomUNet(len(args.input_channels), u_depth=1,
-                           out1_channels=8, batchnorm=True, device=device)
+        model = CustomUNet(len(args.input_channels), u_depth=4,
+                           out1_channels=16, batchnorm=True, device=device)
         if args.model_dir is not None:
             # Save the "architecture" of the model by copy/pasting the class definition file
             os.makedirs(os.path.join(args.model_dir), exist_ok=True)

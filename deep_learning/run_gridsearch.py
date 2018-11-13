@@ -15,10 +15,10 @@ from utils_model import CustomUNet
 import run_train
 
 # Parameters
-n_epochs = 5
-u_depths = [1]
-out1_channels = [8]
-learning_rates = [1e-4, 1e-3, 1e-2]
+n_epochs = 10
+u_depths = [4]
+out1_channels = [32]
+learning_rates = [1e-2]
 batch_sizes = [16, 32, 64]
 
 def main():
@@ -46,7 +46,7 @@ def main():
     try:
         for u_depth in u_depths:
             for out1_c in out1_channels:
-                print("\nu_depth={} - out1_c={} (no BN nor normalization):".format(u_depth, out1_c))
+                print("\nu_depth={} - out1_c={}:".format(u_depth, out1_c))
                 
                 for lr in learning_rates:
                     args.learning_rate = lr
@@ -58,7 +58,7 @@ def main():
                             model = CustomUNet(len(args.input_channels), 
                                                u_depth = u_depth,
                                                out1_channels = out1_c, 
-                                               batchnorm = False)
+                                               batchnorm = True)
                             history = run_train.main(args, model=model)
                             best_epoch = np.argmax(history["val_dice"])
                             print(" | loss={:.6f} - dice={:.6f} - diC{:.1f}={:.6f}".format(
@@ -66,10 +66,11 @@ def main():
                                     args.scale_dice, history["val_diC%.1f" % args.scale_dice][best_epoch]))
                             
                         except RuntimeError as err: # CUDA out of memory
-                            print(" | RuntimeError ({})".format(lr, bs, err))
+                            print(" | RuntimeError ({})".format(err))
                             
     # If an error occured, still print the elapsed time
-    except BaseException as err:
+    # TODO: this still does not work, I don't know why
+    except KeyboardInterrupt as err:
         print("\nAn unexpected error occured.")
         duration = time.time() - start_time
         duration_msg = "{:.0f}h {:02.0f}min {:02.0f}s".format(duration // 3600, (duration // 60) % 60, duration % 60)
