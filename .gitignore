@@ -1,7 +1,8 @@
 # Data files
+dataset/
+computer_vision/results_CV/
 split_data.py
 *.tif
-*.pkl
 *.png
 
 # Temporary files
