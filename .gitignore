@@ -4,6 +4,9 @@ split_data.py
 *.pkl
 *.png
 
+# Temporary files
+synthetic_data/synth_semih.ipynb
+
 # Caches and checkpoints
 */__pycache__
 */.ipynb_checkpoints
