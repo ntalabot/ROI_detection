@@ -1,4 +1,5 @@
 # Data files
+split_data.py
 *.tif
 *.pkl
 *.png
