@@ -51,6 +51,8 @@ def main(args, model=None):
         args.batch_size, 
         input_channels = args.input_channels, 
         test_dataloader = args.eval_test,
+        synthetic_data = args.synthetic_data,
+        synthetic_ratio = args.synthetic_ratio,
         train_transform = None, train_target_transform = None,
         eval_transform = None, eval_target_transform = None
     )
@@ -60,10 +62,17 @@ def main(args, model=None):
     if args.eval_test:
         N_TEST = len(dataloaders["test"].dataset)
     # Positive class weight (pre-computed)
-    pos_weight = torch.tensor(120.946829).to(device)
+    pos_weight = torch.tensor(120.0).to(device)
     
     if args.verbose:
-        print("%d train images." % N_TRAIN)
+        print("%d train images" % N_TRAIN, end="")
+        if args.synthetic_data:
+            if args.synthetic_ratio is None:
+                print(" (with synthetic data).")
+            else:
+                print(" (with %d%% of synthetic data)." % (args.synthetic_ratio * 100))
+        else:
+            print(".")
         print("%d validation images." % N_VALID)
         if args.eval_test:
             print("%d test images." % N_TEST)
@@ -126,6 +135,7 @@ def main(args, model=None):
         plt.plot(history["epoch"], history["val_dice"])
         plt.xlabel("Epoch")
         plt.ylabel("Dice coef.")
+        plt.ylim(0,1)
         plt.legend(["train dice", "valid dice"])
         plt.subplot(133)
         plt.title("Cropped Dice coefficient (scale = %.1f)" % args.scale_dice)
@@ -133,6 +143,7 @@ def main(args, model=None):
         plt.plot(history["epoch"], history["val_diC%.1f" % args.scale_dice])
         plt.xlabel("Epoch")
         plt.ylabel("Cropped Dice coef.")
+        plt.ylim(0,1)
         plt.legend(["train diC%.1f" % args.scale_dice, "valid diC%.1f" % args.scale_dice])
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         fig.savefig(os.path.join(args.model_dir, "train_fig.png"), dpi=400)
@@ -231,6 +242,18 @@ if __name__ == "__main__":
             type=int,
             default=1,
             help="initial seed for RNG (default=1)"
+    )
+    parser.add_argument(
+            '--synthetic_data', 
+            action="store_true",
+            help="enable the use of synthetic data for training"
+    )
+    parser.add_argument(
+            '--synthetic_ratio', 
+            type=float,
+            default=None,
+            help="(requires synthetic_data to be set) ratio of synthetic data "
+            "vs. real data. If not set, all real and synthetic data are used"
     )
     parser.add_argument(
             '-t', '--timeit', 

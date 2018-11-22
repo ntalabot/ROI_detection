@@ -83,10 +83,11 @@ def get_filenames(data_dir, valid_extensions=('.png', '.jpg', '.jpeg')):
                 rgb_frames: folder with input images
                 seg_frames: folder with target images
             ...
+    data_dir can also be a list of the path to subdirs to use.
     
     Args:
-        data_dir: str
-            Directory/path to the data.
+        data_dir: str, or list of str
+            Directory/path to the data, or list of directories/paths to the subdirs.
         valid_extensions: tuple of str (default = ('.png', '.jpg', '.jpeg'))
             Tuple of the valid image extensions.
     
@@ -94,20 +95,25 @@ def get_filenames(data_dir, valid_extensions=('.png', '.jpg', '.jpeg')):
         x_filenames, y_filenames: lists of str 
             Contain the input and target image paths respectively.
     """
+    if isinstance(data_dir, list):
+        subdirs_list = data_dir
+    else:
+        subdirs_list = [os.path.join(data_dir, subdir) for subdir in sorted(os.listdir(data_dir))]
+    
     if not isinstance(valid_extensions, tuple):
         valid_extensions = tuple(valid_extensions)
     x_filenames = []
     y_filenames = []
     
-    for data_subdir in sorted(os.listdir(data_dir)):
+    for data_subdir in subdirs_list:
         # Inputs
-        for frame_filename in sorted(os.listdir(os.path.join(data_dir, data_subdir, "rgb_frames"))):
+        for frame_filename in sorted(os.listdir(os.path.join(data_subdir, "rgb_frames"))):
             if frame_filename.lower().endswith(valid_extensions):
-                x_filenames.append(os.path.join(data_dir, data_subdir, "rgb_frames", frame_filename))
+                x_filenames.append(os.path.join(data_subdir, "rgb_frames", frame_filename))
         # Targets
-        for frame_filename in sorted(os.listdir(os.path.join(data_dir, data_subdir, "seg_frames"))):
+        for frame_filename in sorted(os.listdir(os.path.join(data_subdir, "seg_frames"))):
             if frame_filename.lower().endswith(valid_extensions):
-                y_filenames.append(os.path.join(data_dir, data_subdir, "seg_frames", frame_filename))
+                y_filenames.append(os.path.join(data_subdir, "seg_frames", frame_filename))
         
     return x_filenames, y_filenames
 
@@ -141,6 +147,7 @@ def get_dataloader(data_dir, batch_size, input_channels="R", shuffle=True,
 
 
 def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloader=False,
+                        synthetic_data=False, synthetic_ratio=None,
                         train_transform=None, train_target_transform=None,
                         eval_transform=None, eval_target_transform=None):
     """
@@ -149,14 +156,26 @@ def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloade
     Args:
         data_dir: str
             Directory/path to the data, it should contain "train/", "validation/",
-            and (optional) "test/" subdirs (see get_filenames() for their structure).
+            (optional) "test/", and (optional) "synthetic/" subdirs
+            (see get_filenames() for their specific structure).
         batch_size: int
             Number of samples to return as a batch.
         input_channels: str (default = "R")
             Indicates the channels to load from the input images, e.g. "RG"
             for Red and Green.
         test_dataloader: bool (default = False)
-            If True, the dictionary will contain the test_loader under "test".
+            If True, the dictionary will contain the test loader under "test".
+        synthetic_data: bool (default = False)
+            If True, the train loader will contain the synthetic data.
+            See synthetic_ratio for choosing the proportion of synthetic data.
+        synthetic_ratio: float (default = None)
+            If synthetic_data is False, this is ignored.
+            If not set, all data under "train/" and "synthetic/" are used for 
+            the training (this is the default use).
+            If set, it represents the ratio of synthetic vs. real data to use
+            for training. For instance, if set to 0.25 and there are 100 
+            experiments in "train/", 75 of them will be randomly chosen, as
+            well as 25 synthetic experiments to build the train set.
         train_transform: callable (default = None)
             Transformation to apply to the train input images.
         train_target_transform: callable (default = None)
@@ -170,8 +189,26 @@ def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloade
         A dictionary with the train, validation and (optional) test dataloaders
         under the respective keys "train", "valid", and "test".
     """
+    # If synthetic data is used, build a list of folders for the train set
+    if synthetic_data:
+        if synthetic_ratio is None:
+            train_dir = [os.path.join(data_dir, "train/", subdir) for subdir 
+                         in sorted(os.listdir(os.path.join(data_dir, "train/")))] + \
+                        [os.path.join(data_dir, "synthetic/", subdir) for subdir 
+                         in sorted(os.listdir(os.path.join(data_dir, "synthetic/")))]
+        else:
+            real_dirs = np.random.permutation(sorted(os.listdir(os.path.join(data_dir, "train/"))))
+            real_dirs = [os.path.join(data_dir, "train/", subdir) for subdir in real_dirs]
+            synth_dirs = np.random.permutation(sorted(os.listdir(os.path.join(data_dir, "synthetic/"))))
+            synth_dirs = [os.path.join(data_dir, "synthetic/", subdir) for subdir in synth_dirs]
+            n_dirs = len(real_dirs)
+            train_dir = real_dirs[:int(np.rint(synthetic_ratio * n_dirs))] + \
+                        synth_dirs[int(np.rint(synthetic_ratio * n_dirs)):]
+    else:
+        train_dir = os.path.join(data_dir, "train/")
+    
     train_loader = get_dataloader(
-            os.path.join(data_dir, "train/"),
+            train_dir,
             batch_size=batch_size,
             input_channels=input_channels,
             shuffle=True,
