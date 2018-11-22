@@ -5,7 +5,7 @@ Code for testing and generating synthetic data that can be used for training.
   1. Make a script/function to create synth stacks easily
 
 # Files
-  * `stats_*.pkl`: Pickle histograms representing the pixel intensity of real data in 256 bins (0->255). '*' should be the date in yymmdd format of the last update. In order, the pickle objects are:
+  * `stats_*.pkl`: Pickle histograms representing the pixel intensity of real data in 256 bins (0->255). '*' should be the date in yymmdd format of the last update. In order, the pickled objects are:
     * `pixel_bkg`: histogram of background pixel intensity
     * `pixel_fg`: histogram of foreground (=ROI) pixel intensity
     * `roi_max`: histogram of maximal pixel intensity among ROI
