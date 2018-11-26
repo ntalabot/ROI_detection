@@ -202,8 +202,8 @@ def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloade
             synth_dirs = np.random.permutation(sorted(os.listdir(os.path.join(data_dir, "synthetic/"))))
             synth_dirs = [os.path.join(data_dir, "synthetic/", subdir) for subdir in synth_dirs]
             n_dirs = len(real_dirs)
-            train_dir = real_dirs[:int(np.rint(synthetic_ratio * n_dirs))] + \
-                        synth_dirs[int(np.rint(synthetic_ratio * n_dirs)):]
+            train_dir = real_dirs[int(np.rint(synthetic_ratio * n_dirs)):] + \
+                        synth_dirs[:int(np.rint(synthetic_ratio * n_dirs))]
     else:
         train_dir = os.path.join(data_dir, "train/")
     

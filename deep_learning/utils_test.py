@@ -46,7 +46,7 @@ def predict_stack(model, stack, batch_size, input_channels="R"):
     if isinstance(stack, str):
         stack = imread_to_float(stack, scaling=255)
         channels = {"R": stack[...,0], "G": stack[...,1], "B": stack[...,2]}
-        stack = np.stack([channels[channel] for channel in input_channels], axis=0)
+        stack = np.stack([channels[channel] for channel in input_channels], axis=1)
     elif isinstance(stack, np.ndarray):
         stack = torch.from_numpy(stack)
     else:
@@ -134,7 +134,7 @@ def show_sample(model, dataloader, n_samples=4, post_processing=None, metrics=No
     
     if metrics is not None:
         for i, idx in enumerate(indices):
-            print("Image % 6d: " % idx, end="")
+            print("Image % 6d (%s): " % (idx, dataloader.dataset.x_filenames[idx]))
             for key in metrics.keys():
                 print("{} = {:.6f} - ".format(key, metrics[key](preds[i].unsqueeze(0), 
                                                               targets[i].unsqueeze(0))),

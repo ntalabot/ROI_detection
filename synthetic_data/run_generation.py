@@ -24,7 +24,7 @@ from utils_common.image import to_npint
 from utils_common.processing import flood_fill
 
 
-def synthetic_stack(shape, n_images, n_neurons=-1):
+def synthetic_stack(shape, n_images, n_neurons):
     """
     Return a stack of synthetic neural images, with its ground truth segmentation.
     
@@ -33,9 +33,8 @@ def synthetic_stack(shape, n_images, n_neurons=-1):
             Tuple (height, width) representing the shape of the images.
         n_images: int
             Number of images in the stack.
-        n_neurons: int, default to -1
+        n_neurons: int
             Number of neurons to be present on the stack.
-            If -1, will be randomly sampled between [2, 4].
             
     Returns:
         synth_stack: ndarray of shape NxHxW
@@ -46,8 +45,6 @@ def synthetic_stack(shape, n_images, n_neurons=-1):
     # Initialization
     n_samples = 1000 # number of samples for gaussian neurons
     grid_size = 8 # for the elastic deformation
-    if n_neurons == -1:
-        n_neurons = np.random.randint(2, 4 + 1)
     
     ## Create the gaussians representing the neurons
     max_neurons = []
@@ -149,10 +146,10 @@ def gray2red(image):
 
 if __name__ == "__main__":
     ## Parameters and constants
-    n_neurons = 2 # -1 for random
+    n_neurons = -1 # -1 for random
     n_stacks = 78
     n_images = 600
-    synth_dir = "../dataset/synthetic/"
+    synth_dir = "../dataset/synthetic_2-4/"
     shape = (192, 256)
     # Following are pre-computed on real data (dating of 21 Nov 2018). See stats_181121.pkl & README.md.
     _BKG_MEAN = 0.041733140976778674 # mean value of background
@@ -161,11 +158,17 @@ if __name__ == "__main__":
     _ROI_MAX_STD = 0.13925117610178622 # std of ROI max (excluding 1.0)
     
     date = time.strftime("%y%m%d", time.localtime())
+    if n_neurons == -1:
+        rand_neurons = True
+    else:
+        rand_neurons = False
         
     start = time.time()
     for i in range(n_stacks):
-        folder = os.path.join(synth_dir, "synth_{}neur_{}_{:03d}".format(
-            n_neurons, date, i))
+        if rand_neurons:
+            n_neurons = np.random.randint(2, 4 + 1)
+        
+        folder = os.path.join(synth_dir, "synth_{}neur_{:03d}".format(n_neurons, i))
         print("Creating stack %d/%d" % (i + 1, n_stacks), end="")
         print("  - folder:", folder)
         

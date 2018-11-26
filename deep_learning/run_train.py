@@ -147,6 +147,9 @@ def main(args, model=None):
         plt.legend(["train diC%.1f" % args.scale_dice, "valid diC%.1f" % args.scale_dice])
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         fig.savefig(os.path.join(args.model_dir, "train_fig.png"), dpi=400)
+        print("Training figure saved at %s." % os.path.join(args.model_dir, "train_fig.png"))
+    if args.model_dir is not None:
+        print("Best model saved under %s." % args.model_dir)
        
     ## Evaluate best model over test data
     if args.eval_test:

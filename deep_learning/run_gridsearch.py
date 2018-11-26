@@ -19,7 +19,7 @@ n_epochs = 10
 synth_ratios = [0.0, 0.25, 0.5, 0.75, 1.0]
 
 def main():
-    print("Starting on %s\n\nResults over validation data (%d epochs):" % (time.ctime(), n_epochs))
+    print("Starting on %s\n\nResults over validation data (%d epochs):\n" % (time.ctime(), n_epochs))
     start_time = time.time()
     
     # Arguments for run_train
@@ -35,17 +35,16 @@ def main():
             save_fig = False,
             scale_dice = 4.0,
             seed = 1,
-            synthetic_data = False,
+            synthetic_data = True,
             synthetic_ratio = None,
             timeit = False,
             verbose = False
     )
     model = None
     
-    args.synthetic_data = True
     for synth_ratio in synth_ratios:
         args.synthetic_ratio = synth_ratio
-        print("\nsynth_ratio={}".format(synth_ratio), end="", flush=True)
+        print("synth_ratio={: <4}".format(synth_ratio), end="", flush=True)
                     
         try:
             model = CustomUNet(len(args.input_channels), 
