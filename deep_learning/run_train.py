@@ -18,8 +18,8 @@ import matplotlib.pyplot as plt
 
 import torch
 
-from utils_common.metrics import dice_coef, crop_dice_coef
 from utils_data import get_all_dataloaders
+from utils_loss import get_crop_loss, get_dice_metric, get_crop_dice_metric
 from utils_model import CustomUNet
 from utils_train import train
 from utils_test import evaluate
@@ -94,15 +94,10 @@ def main(args, model=None):
         print("\nModel definition:", model, "\n")
     
     loss_fn = torch.nn.BCEWithLogitsLoss(reduction='elementwise_mean', pos_weight=pos_weight)
+    crop_loss = get_crop_loss(loss_fn, scale=args.scale_crop, device=device)
     
-    dice_metric = lambda preds, targets: torch.tensor(
-            dice_coef((torch.sigmoid(preds.cpu()) > 0.5).detach().numpy(),
-                      targets.cpu().detach().numpy()))
-    
-    diceC_metric = lambda preds, targets: torch.tensor(
-        crop_dice_coef((torch.sigmoid(preds.cpu()) > 0.5).detach().numpy(),
-                       targets.cpu().detach().numpy(),
-                       scale = args.scale_dice))
+    dice_metric = get_dice_metric()
+    diceC_metric = get_crop_dice_metric(scale=args.scale_crop)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     
@@ -112,8 +107,9 @@ def main(args, model=None):
                                 loss_fn,
                                 optimizer,
                                 args.epochs,
-                                metrics = {"dice": dice_metric, 
-                                           "diC%.1f" % args.scale_dice: diceC_metric},
+                                metrics = {"lossC%.1f" % args.scale_crop: crop_loss,
+                                           "dice": dice_metric, 
+                                           "diC%.1f" % args.scale_crop: diceC_metric},
                                 criterion_metric = "dice",
                                 model_dir = args.model_dir,
                                 replace_dir = True,
@@ -121,30 +117,26 @@ def main(args, model=None):
     
     ## Save a figure if applicable
     if args.save_fig and args.model_dir is not None:
-        fig = plt.figure(figsize=(12,6))
-        plt.subplot(131)
-        plt.title("Loss")
-        plt.plot(history["epoch"], history["loss"])
-        plt.plot(history["epoch"], history["val_loss"])
+        fig = plt.figure(figsize=(8,6))
+        plt.subplot(121)
+        plt.title("Loss\n(crop scale = %.1f)" % args.scale_crop)
+        plt.plot(history["epoch"], history["loss"], color="C0")
+        plt.plot(history["epoch"], history["lossC%.1f" % args.scale_crop], "--", color="C0")
+        plt.plot(history["epoch"], history["val_loss"], color="C1")
+        plt.plot(history["epoch"], history["val_lossC%.1f" % args.scale_crop], "--", color="C1")
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
-        plt.legend(["train loss", "valid loss"])
-        plt.subplot(132)
-        plt.title("Dice coefficient")
-        plt.plot(history["epoch"], history["dice"])
-        plt.plot(history["epoch"], history["val_dice"])
+        plt.legend(["train loss", "train cropped loss", "valid loss", "valid cropped loss"])
+        plt.subplot(122)
+        plt.title("Dice coefficients\n(crop scale = %.1f)" % args.scale_crop)
+        plt.plot(history["epoch"], history["dice"], color="C0")
+        plt.plot(history["epoch"], history["diC%.1f" % args.scale_crop], "--", color="C0")
+        plt.plot(history["epoch"], history["val_dice"], color="C1")
+        plt.plot(history["epoch"], history["val_diC%.1f" % args.scale_crop], "--", color="C1")
         plt.xlabel("Epoch")
         plt.ylabel("Dice coef.")
         plt.ylim(0,1)
-        plt.legend(["train dice", "valid dice"])
-        plt.subplot(133)
-        plt.title("Cropped Dice coefficient (scale = %.1f)" % args.scale_dice)
-        plt.plot(history["epoch"], history["diC%.1f" % args.scale_dice])
-        plt.plot(history["epoch"], history["val_diC%.1f" % args.scale_dice])
-        plt.xlabel("Epoch")
-        plt.ylabel("Cropped Dice coef.")
-        plt.ylim(0,1)
-        plt.legend(["train diC%.1f" % args.scale_dice, "valid diC%.1f" % args.scale_dice])
+        plt.legend(["train dice", "train cropped dice", "valid dice", "valid cropped dice"])
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         fig.savefig(os.path.join(args.model_dir, "train_fig.png"), dpi=400)
         print("Training figure saved at %s." % os.path.join(args.model_dir, "train_fig.png"))
@@ -154,12 +146,13 @@ def main(args, model=None):
     ## Evaluate best model over test data
     if args.eval_test:
         test_metrics = evaluate(best_model, dataloaders["test"], 
-                                {"loss": loss_fn, "dice": dice_metric,
-                                 "diC%.1f" % args.scale_dice: diceC_metric})
+                                {"loss": loss_fn, "lossC%.1f" % args.scale_crop: crop_loss,
+                                 "dice": dice_metric, "diC%.1f" % args.scale_crop: diceC_metric})
         if args.verbose:
             print("\nTest loss = {}".format(test_metrics["loss"]))
+            print("Crop loss = {}".format(test_metrics["lossC%.1f" % args.scale_crop]))
             print("Test dice = {}".format(test_metrics["dice"]))
-            print("Crop dice = {}".format(test_metrics["diC%.1f" % args.scale_dice]))
+            print("Crop dice = {}".format(test_metrics["diC%.1f" % args.scale_crop]))
         
     ## Display script duration if applicable
     if args.timeit:
@@ -234,11 +227,11 @@ if __name__ == "__main__":
             "(requires the --model_dir argument to be set)"
     )
     parser.add_argument(
-            '--scale_dice', 
+            '--scale_crop', 
             type=float,
             default=4.0,
             help="scaling of the cropping (w.r.t. ROI's bounding box) for "
-            "the cropped dice coef. (default=4.0)"
+            "the cropped metrics. (default=4.0)"
     )
     parser.add_argument(
             '--seed', 

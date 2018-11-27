@@ -16,7 +16,7 @@ from skimage import morphology as morph
 
 from utils_common.image import imread_to_float, overlay_mask_stack, to_npint
 from utils_common.processing import preprocess_stack
-from utils_common.metrics import dice_coef, crop_dice_coef
+from utils_common.metrics import dice_coef, crop_metric
 import utils_common.register_cc as reg
 
 def main(args):
@@ -136,7 +136,7 @@ def main(args):
 #            gt_centroids = pickle.load(file)
         # Compute losses
         losses_dice.append(dice_coef(seg_ROI, gt_seg_ROI, reduction='sum'))
-        losses_diC.append(crop_dice_coef(seg_ROI, gt_seg_ROI, scale=scale_dice, reduction='sum'))
+        losses_diC.append(crop_metric(dice_coef, seg_ROI, gt_seg_ROI, scale=scale_dice, reduction='sum'))
         
         image_counter += len(stack)
     

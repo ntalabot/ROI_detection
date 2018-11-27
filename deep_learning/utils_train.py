@@ -101,10 +101,10 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
                 running_metrics[key] = 0
             
             # Iterate over the data
-            for i, (batch_x, batch_y) in enumerate(dataloaders[phase]): 
+            for i, (batch_x_cpu, batch_y_cpu) in enumerate(dataloaders[phase]): 
                 # Copy tensor to the model device
-                batch_x = batch_x.to(model.device)
-                batch_y = batch_y.to(model.device)
+                batch_x = batch_x_cpu.to(model.device)
+                batch_y = batch_y_cpu.to(model.device)
                 
                 with torch.set_grad_enabled(phase == "train"):
                     # Forward pass
@@ -115,9 +115,10 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
                     running_loss += loss.item() * batch_x.shape[0]
                     
                     # Metrics
+                    y_pred_cpu = y_pred.cpu()
                     for key in metrics.keys():
                         running_metrics[key] += \
-                            metrics[key](y_pred, batch_y).item() * batch_x.shape[0]
+                            metrics[key](y_pred_cpu, batch_y_cpu).item() * batch_x.shape[0]
                         
                     if phase == "train":
                         if ((i + 1) % int(len(dataloaders[phase]) / 10) == 0 or i == 0) and verbose: 

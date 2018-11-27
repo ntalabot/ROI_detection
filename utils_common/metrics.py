@@ -13,7 +13,7 @@ from skimage import measure
 
 def loss_mae(predictions, targets, reduction='mean'):
     """Compute the (Mean) Average Error between predictions and targets."""
-    if reduction in ["mean", "ave", "average"]:
+    if reduction in ["elementwise_mean", "mean", "ave", "average"]:
         return np.abs(targets[:] - predictions[:]).mean()
     elif reduction in ["sum"]:
         return np.abs(targets[:] - predictions[:]).sum()
@@ -26,7 +26,7 @@ def loss_l2(predictions, targets, reduction='mean'):
     for i in range(len(targets)):
         loss += np.linalg.norm(targets[i] - predictions[i])
     
-    if reduction in ["mean", "ave", "average"]:
+    if reduction in ["elementwise_mean", "mean", "ave", "average"]:
         return loss / len(targets)
     elif reduction in ["sum"]:
         return loss
@@ -43,22 +43,29 @@ def dice_coef(predictions, targets, reduction='mean'):
         else:
             dice += 2.0 * np.logical_and(targets[i], predictions[i]).sum() / total_pos
     
-    if reduction in ["mean", "ave", "average"]:
+    if reduction in ["elementwise_mean", "mean", "ave", "average"]:
         return dice / len(targets)
     elif reduction in ["sum"]:
         return dice
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
-def crop_dice_coef(predictions, targets, scale=4.0, reduction='mean'):
-    """Compute the Dice coefficient around the cropped targets' connected regions.
+def crop_metric(metric_fn, predictions, targets, scale=4.0, reduction='mean'):
+    """
+    Compute the metric around the cropped targets' connected regions.
     
     Size of the cropped region will be bounding_box * scale.
     """
-    dice = 0.0
+    metric = 0.0
+    n_no_positive = 0 # number of target with no positive pixels (fully background)
     for i in range(len(targets)):
         labels = measure.label(targets[i])
+        # If no true positive region, does not consider the image
+        if labels.max() == 0:
+            n_no_positive += 1.0
+            continue
         regionprops = measure.regionprops(labels)
+        
         # Loop over targets' connected regions
         for region in regionprops:
             min_row, min_col, max_row, max_col = region.bbox
@@ -69,15 +76,13 @@ def crop_dice_coef(predictions, targets, scale=4.0, reduction='mean'):
             max_col = int(min(targets[i].shape[1], max_col + width * (scale-1) / 2))
             min_col = int(max(0, min_col - width * (scale-1) / 2))
             
-            dice += 2.0 * np.logical_and(targets[i][min_row:max_row, min_col:max_col],
-                                         predictions[i][min_row:max_row, min_col:max_col]).sum() / \
-                    (targets[i][min_row:max_row, min_col:max_col].sum() + \
-                     predictions[i][min_row:max_row, min_col:max_col].sum()) / \
-                    len(regionprops) # Averaging factor for multiple ROI in same image
+            metric += metric_fn(np.array([predictions[i][min_row:max_row, min_col:max_col]]), 
+                                np.array([targets[i][min_row:max_row, min_col:max_col]])) / \
+                      len(regionprops) # Averaging factor for multiple region in same image
     
-    if reduction in ["mean", "ave", "average"]:
-        return dice / len(targets)
+    if reduction in ["elementwise_mean", "mean", "ave", "average"]:
+        return metric / (len(targets) - n_no_positive)
     elif reduction in ["sum"]:
-        return dice
+        return metric
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)

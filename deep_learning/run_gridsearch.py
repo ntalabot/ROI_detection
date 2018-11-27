@@ -33,7 +33,7 @@ def main():
             model_dir = None,
             no_gpu = False,
             save_fig = False,
-            scale_dice = 4.0,
+            scale_crop = 4.0,
             seed = 1,
             synthetic_data = True,
             synthetic_ratio = None,
@@ -53,9 +53,11 @@ def main():
                                batchnorm = True)
             history = run_train.main(args, model=model)
             best_epoch = np.argmax(history["val_dice"])
-            print(" | loss={:.6f} - dice={:.6f} - diC{:.1f}={:.6f}".format(
-                    history["val_loss"][best_epoch], history["val_dice"][best_epoch],
-                    args.scale_dice, history["val_diC%.1f" % args.scale_dice][best_epoch]))
+            print(" | loss={:.6f} - lossC{:.1f}={:.6f} - dice={:.6f} - diC{:.1f}={:.6f}".format(
+                    history["val_loss"][best_epoch], 
+                    args.scale_crop, history["val_lossC%.1f" % args.scale_crop][best_epoch],
+                    history["val_dice"][best_epoch],
+                    args.scale_crop, history["val_diC%.1f" % args.scale_crop][best_epoch]))
             
         except RuntimeError as err: # CUDA out of memory
             print(" | RuntimeError ({})".format(err))
