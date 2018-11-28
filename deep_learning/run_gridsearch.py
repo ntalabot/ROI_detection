@@ -35,7 +35,8 @@ def main():
             save_fig = False,
             scale_crop = 4.0,
             seed = 1,
-            synthetic_data = True,
+            synthetic_data = False,
+            synthetic_only = False,
             synthetic_ratio = None,
             timeit = False,
             verbose = False

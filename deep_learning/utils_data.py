@@ -148,6 +148,7 @@ def get_dataloader(data_dir, batch_size, input_channels="R", shuffle=True,
 
 def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloader=False,
                         synthetic_data=False, synthetic_ratio=None,
+                        synthetic_only=False,
                         train_transform=None, train_target_transform=None,
                         eval_transform=None, eval_target_transform=None):
     """
@@ -176,6 +177,11 @@ def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloade
             for training. For instance, if set to 0.25 and there are 100 
             experiments in "train/", 75 of them will be randomly chosen, as
             well as 25 synthetic experiments to build the train set.
+        synthetic_only: bool (default = False)
+            If True, the train dataloader will contain only the synthetic data.
+            As opposed to synthetic_ratio=1.0, this will use all of the data
+            under "synthetic/", instead of using as many experiments as there 
+            are in "train/". /!\ Overwrite synthetic_data.
         train_transform: callable (default = None)
             Transformation to apply to the train input images.
         train_target_transform: callable (default = None)
@@ -190,7 +196,10 @@ def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloade
         under the respective keys "train", "valid", and "test".
     """
     # If synthetic data is used, build a list of folders for the train set
-    if synthetic_data:
+    if synthetic_only:
+        train_dir = [os.path.join(data_dir, "synthetic/", subdir) for subdir 
+                     in sorted(os.listdir(os.path.join(data_dir, "synthetic/")))]
+    elif synthetic_data:
         if synthetic_ratio is None:
             train_dir = [os.path.join(data_dir, "train/", subdir) for subdir 
                          in sorted(os.listdir(os.path.join(data_dir, "train/")))] + \

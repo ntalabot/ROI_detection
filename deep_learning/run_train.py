@@ -53,6 +53,7 @@ def main(args, model=None):
         test_dataloader = args.eval_test,
         synthetic_data = args.synthetic_data,
         synthetic_ratio = args.synthetic_ratio,
+        synthetic_only = args.synthetic_only,
         train_transform = None, train_target_transform = None,
         eval_transform = None, eval_target_transform = None
     )
@@ -66,7 +67,9 @@ def main(args, model=None):
     
     if args.verbose:
         print("%d train images" % N_TRAIN, end="")
-        if args.synthetic_data:
+        if args.synthetic_only:
+            print(" (of synthetic data only).")
+        elif args.synthetic_data:
             if args.synthetic_ratio is None:
                 print(" (with synthetic data).")
             else:
@@ -243,6 +246,14 @@ if __name__ == "__main__":
             '--synthetic_data', 
             action="store_true",
             help="enable the use of synthetic data for training"
+    )
+    parser.add_argument(
+            '--synthetic_only', 
+            action="store_true",
+            help="use only the synthetic data for training. This is different "
+            "than using --synthetic_ration 1.0 as it will always use all the "
+            "synthetic data, without being limited to the number of experiment "
+            "in the train set"
     )
     parser.add_argument(
             '--synthetic_ratio', 
