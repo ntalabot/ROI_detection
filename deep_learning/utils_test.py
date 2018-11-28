@@ -143,9 +143,9 @@ def show_sample(model, dataloader, n_samples=4, post_processing=None, metrics=No
         
     plt.figure(figsize=(12,10))
     plt.subplot(311); plt.title("Inputs")
-    plt.imshow(outs.cpu().numpy().transpose([1,2,0]))
+    plt.imshow(outs.cpu().numpy().transpose([1,2,0]), vmin=0, vmax=1)
     plt.subplot(312); plt.title("Predictions")
-    plt.imshow(outs_p.cpu().numpy().transpose([1,2,0]), vmin=0, vmax=1)
+    plt.imshow(outs_p.cpu().numpy().transpose([1,2,0]).clip(0,1), vmin=0, vmax=1)
     plt.subplot(313); plt.title("Ground truths")
     plt.imshow(outs_t.cpu().numpy().transpose([1,2,0]), vmin=0, vmax=1)
     plt.tight_layout()
