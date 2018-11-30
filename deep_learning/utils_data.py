@@ -118,6 +118,32 @@ def get_filenames(data_dir, valid_extensions=('.png', '.jpg', '.jpeg')):
     return x_filenames, y_filenames
 
 
+def _pad_collate(batch):
+    """Collate function that pads input/target images to the same size."""
+    pad_batch = []
+    
+    # Find largest shape (note that first dimension is channel)
+    shapes = [item[0].shape[1:] for item in batch]
+    heights = np.array([height for height, width in shapes])
+    widths = np.array([width for height, width in shapes])
+    max_height = np.max(heights)
+    max_width = np.max(widths)
+    # If all of the same size, don't pad
+    if (heights == max_height).all() and (widths == max_width).all():
+        return data.dataloader.default_collate(batch)
+    
+    # Pad images to largest shape 
+    for item in batch:
+        shape = item[0].shape
+        padding = [(int(np.floor((max_height - shape[1])/2)), int(np.ceil((max_height - shape[1])/2))), 
+                   (int(np.floor((max_width - shape[2])/2)), int(np.ceil((max_width - shape[2])/2)))]
+        pad_batch.append((
+            np.pad(item[0], [(0,0)] + padding, 'constant'),
+            np.pad(item[1], padding, 'constant')))
+    
+    return data.dataloader.default_collate(pad_batch)
+
+
 def get_dataloader(data_dir, batch_size, input_channels="R", shuffle=True,
                    transform=None, target_transform=None, num_workers=1):
     """
@@ -143,12 +169,13 @@ def get_dataloader(data_dir, batch_size, input_channels="R", shuffle=True,
     x, y = get_filenames(data_dir)
     dataset = ImageLoaderDataset(x, y, input_channels=input_channels,
                                  transform=transform, target_transform=target_transform)
-    return data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
+    return data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle,
+                           collate_fn=_pad_collate, num_workers=num_workers)
 
 
 def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloader=False,
                         synthetic_data=False, synthetic_ratio=None,
-                        synthetic_only=False,
+                        synthetic_only=False, variable_size=False,
                         train_transform=None, train_target_transform=None,
                         eval_transform=None, eval_target_transform=None):
     """

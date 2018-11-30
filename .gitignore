@@ -5,8 +5,9 @@ split_data.py
 *.tif
 *.png
 
-# Temporary files
+# Temporary/test files
 synthetic_data/synth_semih.ipynb
+utils_common/dice_visualization.ipnb
 
 # Caches and checkpoints
 */__pycache__

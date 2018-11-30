@@ -11,12 +11,10 @@ Created on Thu Nov 22 10:01:56 2018
 import os, time
 import warnings
 import math
-import ipywidgets as widgets
-from ipywidgets import interact
 
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage import io, draw, color
+from skimage import io, draw
 from scipy.stats import multivariate_normal
 from imgaug import augmenters as iaa
 
@@ -24,9 +22,17 @@ from utils_common.image import to_npint
 from utils_common.processing import flood_fill
 
 
+# Following are pre-computed on real data (dating of 21 Nov 2018). See stats_181121.pkl & README.md.
+_BKG_MEAN = 0.041733140976778674 # mean value of background
+_BKG_STD = 0.01 # Standard deviation of mean value of background (manually tuned)
+_ROI_MAX_1 = 0.2276730082246407 # fraction of ROI with 1 as max intensity
+_ROI_MAX_MEAN = 0.6625502112855037 # mean of ROI max (excluding 1.0)
+_ROI_MAX_STD = 0.13925117610178622 # std of ROI max (excluding 1.0)
+
+
 def synthetic_stack(shape, n_images, n_neurons):
     """
-    Return a stack of synthetic neural images, with its ground truth segmentation.
+    Return a stack of synthetic neural images.
     
     Args:
         shape: tuple of int
@@ -43,7 +49,12 @@ def synthetic_stack(shape, n_images, n_neurons):
             Stack of N synthetic segmentations.
     """ 
     # Initialization
-    n_samples = 1000 # number of samples for gaussian neurons
+    # Number of samples for each neuron (manually tuned)
+    n_samples = np.random.normal(loc=1500, scale=400, size=n_neurons) 
+    if n_neurons == 1:
+        n_samples = [int(n_samples + 0.5)]
+    else:
+        n_samples = (n_samples + 0.5).astype(np.uint16)
     grid_size = 8 # for the elastic deformation
     
     ## Create the gaussians representing the neurons
@@ -58,12 +69,15 @@ def synthetic_stack(shape, n_images, n_neurons):
         # Create neuron infinitly until in image and no overlap with another
         # TODO: change this to something that cannot loop to infinity
         while True:
+            # Mean and covariance matrix of gaussian (manually tuned)
             # Note that x and y axes are col and row (so, inversed!)
             mean = np.array([np.random.randint(shape[1]), np.random.randint(shape[0])])
-            cross_corr = np.random.randint(-15, 15)
+            scale_x = shape[1] / 50
+            scale_y = shape[0] / 50
+            cross_corr = np.random.randint(-2, 2) * min(scale_x, scale_y)
             cov = np.array([
-                [np.random.randint(5, 15), cross_corr],
-                [cross_corr, np.random.randint(50, 150)]
+                [np.random.randint(1, 3) * scale_x, cross_corr],
+                [cross_corr, np.random.randint(10, 30) * scale_y]
             ])
 
             # Bounding ellipses
@@ -114,7 +128,7 @@ def synthetic_stack(shape, n_images, n_neurons):
             wrp_gaussian = seq_det.augment_image(neurons[j])
             wrp_gaussian /= wrp_gaussian.sum()
             # Sample from it
-            x = np.random.choice(shape[0] * shape[1], size=n_samples, p=wrp_gaussian.ravel())
+            x = np.random.choice(shape[0] * shape[1], size=n_samples[j], p=wrp_gaussian.ravel())
             y, x = np.unravel_index(x, shape)
             hist = plt.hist2d(x, y, bins=[shape[1], shape[0]], range=[[0, shape[1]], [0, shape[0]]])
             plt.close()
@@ -129,7 +143,8 @@ def synthetic_stack(shape, n_images, n_neurons):
         wrp_segs[i] = flood_fill(np.pad(wrp_segs[i], 1, 'constant'))[1:-1, 1:-1]
     
     ## Add noise (sampled from an exponential distribution)
-    noise = np.random.exponential(scale=_BKG_MEAN, size=(n_images,) + shape)
+    noise_mean = np.random.normal(loc=_BKG_MEAN, scale=_BKG_STD)
+    noise = np.random.exponential(scale=noise_mean, size=(n_images,) + shape)
     
     synth_stack = np.maximum(wrp_neurons, noise)
     synth_seg = wrp_segs
@@ -145,28 +160,26 @@ def gray2red(image):
 
 
 if __name__ == "__main__":
-    ## Parameters and constants
-    n_neurons = -1 # -1 for random
-    n_stacks = 78
-    n_images = 600
-    synth_dir = "../dataset/synthetic_2-4/"
-    shape = (192, 256)
-    # Following are pre-computed on real data (dating of 21 Nov 2018). See stats_181121.pkl & README.md.
-    _BKG_MEAN = 0.041733140976778674 # mean value of background
-    _ROI_MAX_1 = 0.2276730082246407 # fraction of ROI with 1 as max intensity
-    _ROI_MAX_MEAN = 0.6625502112855037 # mean of ROI max (excluding 1.0)
-    _ROI_MAX_STD = 0.13925117610178622 # std of ROI max (excluding 1.0)
+    ## Parameters and constants (shape and n_neurons are below)
+    n_stacks = 200
+    n_images = 200
     
     date = time.strftime("%y%m%d", time.localtime())
-    if n_neurons == -1:
-        rand_neurons = True
-    else:
-        rand_neurons = False
+    synth_dir = "../dataset/synthetic_2-6_%s/" % date
         
     start = time.time()
     for i in range(n_stacks):
-        if rand_neurons:
-            n_neurons = np.random.randint(2, 4 + 1)
+        ### Random parameters here ##
+        # Randomized shape
+        if np.random.rand() < 0.5: # square image half of the time
+            rand_size = np.random.randint(6, 10 + 1) * 32
+            shape = (rand_size, rand_size)
+        else:
+            rand_h = np.random.randint(6, 10 + 1) * 32
+            rand_w = np.random.randint(rand_h/32, 10 + 1) * 32
+            shape = (rand_h, rand_w)
+        # Randomized n_neurons
+        n_neurons = np.random.randint(2, 6 + 1)
         
         folder = os.path.join(synth_dir, "synth_{}neur_{:03d}".format(n_neurons, i))
         print("Creating stack %d/%d" % (i + 1, n_stacks), end="")
