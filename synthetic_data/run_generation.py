@@ -24,7 +24,7 @@ from utils_common.processing import flood_fill
 
 # Following are pre-computed on real data (dating of 21 Nov 2018). See stats_181121.pkl & README.md.
 _BKG_MEAN = 0.041733140976778674 # mean value of background
-_BKG_STD = 0.01 # Standard deviation of mean value of background (manually tuned)
+_BKG_STD = 0.005 # Standard deviation of mean value of background (manually tuned)
 _ROI_MAX_1 = 0.2276730082246407 # fraction of ROI with 1 as max intensity
 _ROI_MAX_MEAN = 0.6625502112855037 # mean of ROI max (excluding 1.0)
 _ROI_MAX_STD = 0.13925117610178622 # std of ROI max (excluding 1.0)
@@ -49,8 +49,9 @@ def synthetic_stack(shape, n_images, n_neurons):
             Stack of N synthetic segmentations.
     """ 
     # Initialization
+    ellipse_size = 1.5 # factor for the ground truth ellipse (normalized by std)
     # Number of samples for each neuron (manually tuned)
-    n_samples = np.random.normal(loc=1500, scale=400, size=n_neurons) 
+    n_samples = np.random.normal(loc=1000, scale=200, size=n_neurons) 
     if n_neurons == 1:
         n_samples = [int(n_samples + 0.5)]
     else:
@@ -84,7 +85,8 @@ def synthetic_stack(shape, n_images, n_neurons):
             val, vec = np.linalg.eig(cov)
             rotation = math.atan2(vec[0, np.argmax(val)], vec[1, np.argmax(val)])
             rr, cc = draw.ellipse(mean[1], mean[0], 
-                                  2*np.sqrt(cov[1,1]), 2*np.sqrt(cov[0,0]),
+                                  ellipse_size * np.sqrt(cov[1,1]), 
+                                  ellipse_size * np.sqrt(cov[0,0]),
                                   rotation=rotation)
             # Check if outside the image
             if (rr < 0).any() or (rr >= shape[0]).any() or (cc < 0).any() or (cc >= shape[1]).any():
@@ -148,6 +150,11 @@ def synthetic_stack(shape, n_images, n_neurons):
     
     synth_stack = np.maximum(wrp_neurons, noise)
     synth_seg = wrp_segs
+    
+    ## 50% chance of clipping with random value (create a random saturation)
+    if np.random.rand() > 0.5:
+        synth_stack = synth_stack.clip(0, np.random.uniform(0.5, 1.0))
+    
     return synth_stack, synth_seg
 
 

@@ -29,6 +29,8 @@ def main(args, model=None):
     ## Initialization
     if args.timeit:
         start_time = time.time()
+    u_depth = 4
+    out1_channels = 16
     
     # Seed the script
     seed = 1
@@ -43,7 +45,29 @@ def main(args, model=None):
         device = torch.device("cpu")
     if args.verbose:
         print("Device set to '{}'.".format(device))
+    
+    # Following transform is to avoid 2x2 maxpooling on odd-sized images
+    def pad_transform(image):
+        """Pad images to multiple of 2**u_depth, if needed."""
+        factor = 2 ** u_depth
+        if image.ndim == 3:
+            height, width = image.shape[1:]
+        elif image.ndim == 2:
+            height, width = image.shape
+            
+        # Do nothing if image has correct shape
+        if height % factor == 0 and width % factor == 0:
+            return image
         
+        height_pad = (factor - height % factor) * bool(height % factor)
+        width_pad = (factor - width % factor) * bool(width % factor)
+        padding = [(int(np.floor(height_pad/2)), int(np.ceil(height_pad/2))), 
+                   (int(np.floor(width_pad/2)), int(np.ceil(width_pad/2)))]
+        if image.ndim == 3:
+            return np.pad(image, [(0,0)] + padding, 'constant')
+        elif image.ndim == 2:
+            return np.pad(image, padding, 'constant')
+    
     ## Data preparation    
     # Create dataloaders
     dataloaders = get_all_dataloaders(
@@ -54,8 +78,8 @@ def main(args, model=None):
         synthetic_data = args.synthetic_data,
         synthetic_ratio = args.synthetic_ratio,
         synthetic_only = args.synthetic_only,
-        train_transform = None, train_target_transform = None,
-        eval_transform = None, eval_target_transform = None
+        train_transform = pad_transform, train_target_transform = pad_transform,
+        eval_transform = pad_transform, eval_target_transform = pad_transform
     )
     
     N_TRAIN = len(dataloaders["train"].dataset)
@@ -83,8 +107,8 @@ def main(args, model=None):
     
     ## Model, loss, and optimizer definition
     if model is None:
-        model = CustomUNet(len(args.input_channels), u_depth=4,
-                           out1_channels=16, batchnorm=True, device=device)
+        model = CustomUNet(len(args.input_channels), u_depth=u_depth,
+                           out1_channels=out1_channels, batchnorm=True, device=device)
         if args.model_dir is not None:
             # Save the "architecture" of the model by copy/pasting the class definition file
             os.makedirs(os.path.join(args.model_dir), exist_ok=True)
