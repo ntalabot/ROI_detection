@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from skimage import io
 
 import torch
 
@@ -86,8 +87,14 @@ def main(args, model=None):
     N_VALID = len(dataloaders["valid"].dataset)
     if args.eval_test:
         N_TEST = len(dataloaders["test"].dataset)
-    # Positive class weight (pre-computed)
-    pos_weight = torch.tensor(120.0).to(device)
+    # Compute class weights (as pixel imbalance)
+    pos_count = 0
+    neg_count = 0
+    for filename in dataloaders["train"].dataset.y_filenames:
+        y = io.imread(filename)
+        pos_count += (y == 255).sum()
+        neg_count += (y == 0).sum()
+    pos_weight = torch.tensor(neg_count / pos_count).to(device)
     
     if args.verbose:
         print("%d train images" % N_TRAIN, end="")
