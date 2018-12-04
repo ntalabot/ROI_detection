@@ -19,7 +19,7 @@ from skimage import io
 
 import torch
 
-from utils_data import get_all_dataloaders
+from utils_data import get_all_dataloaders, normalize_range
 from utils_loss import get_crop_loss, get_dice_metric, get_crop_dice_metric
 from utils_model import CustomUNet
 from utils_train import train
@@ -79,8 +79,8 @@ def main(args, model=None):
         synthetic_data = args.synthetic_data,
         synthetic_ratio = args.synthetic_ratio,
         synthetic_only = args.synthetic_only,
-        train_transform = pad_transform, train_target_transform = pad_transform,
-        eval_transform = pad_transform, eval_target_transform = pad_transform
+        train_transform = lambda img: normalize_range(pad_transform(img)), train_target_transform = pad_transform,
+        eval_transform = lambda img: normalize_range(pad_transform(img)), eval_target_transform = pad_transform
     )
     
     N_TRAIN = len(dataloaders["train"].dataset)
