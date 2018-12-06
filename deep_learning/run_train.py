@@ -79,6 +79,7 @@ def main(args, model=None):
         synthetic_data = args.synthetic_data,
         synthetic_ratio = args.synthetic_ratio,
         synthetic_only = args.synthetic_only,
+        use_mask = args.loss_masking,
         train_transform = lambda img: normalize_range(pad_transform(img)), train_target_transform = pad_transform,
         eval_transform = lambda img: normalize_range(pad_transform(img)), eval_target_transform = pad_transform
     )
@@ -110,6 +111,8 @@ def main(args, model=None):
         print("%d validation images." % N_VALID)
         if args.eval_test:
             print("%d test images." % N_TEST)
+        if args.loss_masking:
+            print("Loss masking is enabled.")
         print("{:.3f} positive weighting.".format(pos_weight.item()))
     
     ## Model, loss, and optimizer definition
@@ -120,7 +123,7 @@ def main(args, model=None):
             # Save the "architecture" of the model by copy/pasting the class definition file
             os.makedirs(os.path.join(args.model_dir), exist_ok=True)
             shutil.copy("utils_model.py", os.path.join(args.model_dir, "utils_model_save.py"))
-    # make sure the given model is on the correct device
+    # Make sure the given model is on the correct device
     else: 
         model.to(device)
         
@@ -178,6 +181,7 @@ def main(args, model=None):
         print("Best model saved under %s." % args.model_dir)
        
     ## Evaluate best model over test data
+    # /!\ Note: this does NOT use masking in any case.
     if args.eval_test:
         test_metrics = evaluate(best_model, dataloaders["test"], 
                                 {"loss": loss_fn, "lossC%.1f" % args.scale_crop: crop_loss,
@@ -243,6 +247,11 @@ if __name__ == "__main__":
             type=float,
             default=0.001,
             help="learning rate for the stochastic gradient descent (default=0.001)"
+    )
+    parser.add_argument(
+            '--loss_masking', 
+            action="store_true",
+            help="enable the use of loss masking using pre-computed masks"
     )
     parser.add_argument(
             '--model_dir', 

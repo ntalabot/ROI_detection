@@ -30,6 +30,7 @@ def main():
             eval_test = False,
             input_channels = "R",
             learning_rate = 0.001,
+            loss_masking = False,
             model_dir = None,
             no_gpu = False,
             save_fig = False,
