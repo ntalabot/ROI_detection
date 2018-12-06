@@ -153,7 +153,8 @@ def synthetic_stack(shape, n_images, n_neurons):
     
     ## 50% chance of clipping with random value (create a random saturation)
     if np.random.rand() > 0.5:
-        synth_stack = synth_stack.clip(0, np.random.uniform(0.5, 1.0))
+        rand_sat = np.random.uniform(0.5, 1.0)
+        synth_stack = synth_stack.clip(0, rand_sat) / rand_sat
     
     return synth_stack, synth_seg
 
