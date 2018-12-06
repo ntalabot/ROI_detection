@@ -76,7 +76,7 @@ def evaluate(model, dataloader, metrics):
     # Compute metrics over all data
     model.eval()
     with torch.no_grad():
-        for i, (batch_x, batch_y) in enumerate(dataloader):
+        for i, (batch_x, batch_y, _) in enumerate(dataloader):
             batch_x = batch_x.to(model.device)
             batch_y = batch_y.to(model.device)
             
@@ -137,7 +137,7 @@ def show_sample(model, dataloader, n_samples=4, post_processing=None, metrics=No
             print("Image % 6d (%s): " % (idx, dataloader.dataset.x_filenames[idx]))
             for key in metrics.keys():
                 print("{} = {:.6f} - ".format(key, metrics[key](preds[i].unsqueeze(0), 
-                                                              targets[i].unsqueeze(0))),
+                                                                targets[i].unsqueeze(0))),
                       end="")
             print("\b\b")
         

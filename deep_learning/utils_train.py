@@ -101,17 +101,19 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
                 running_metrics[key] = 0
             
             # Iterate over the data
-            for i, (batch_x_cpu, batch_y_cpu) in enumerate(dataloaders[phase]): 
+            for i, (batch_x_cpu, batch_y_cpu, batch_mask_cpu) in enumerate(dataloaders[phase]): 
                 # Copy tensor to the model device
                 batch_x = batch_x_cpu.to(model.device)
                 batch_y = batch_y_cpu.to(model.device)
+                batch_mask = batch_mask_cpu.to(model.device)
                 
                 with torch.set_grad_enabled(phase == "train"):
                     # Forward pass
                     y_pred = model(batch_x)
                     
-                    # Loss
-                    loss = loss_fn(y_pred, batch_y)
+                    # Masked loss
+                    masking = (1 - batch_mask)
+                    loss = loss_fn(y_pred[masking], batch_y[masking])
                     running_loss += loss.item() * batch_x.shape[0]
                     
                     # Metrics
