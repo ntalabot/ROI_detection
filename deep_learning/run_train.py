@@ -181,11 +181,11 @@ def main(args, model=None):
         print("Best model saved under %s." % args.model_dir)
        
     ## Evaluate best model over test data
-    # /!\ Note: this does NOT use masking in any case.
     if args.eval_test:
         test_metrics = evaluate(best_model, dataloaders["test"], 
-                                {"loss": loss_fn, "lossC%.1f" % args.scale_crop: crop_loss,
-                                 "dice": dice_metric, "diC%.1f" % args.scale_crop: diceC_metric})
+                                {"lossC%.1f" % args.scale_crop: crop_loss,
+                                 "dice": dice_metric, "diC%.1f" % args.scale_crop: diceC_metric},
+                                loss=loss_fn)
         if args.verbose:
             print("\nTest loss = {}".format(test_metrics["loss"]))
             print("Crop loss = {}".format(test_metrics["lossC%.1f" % args.scale_crop]))

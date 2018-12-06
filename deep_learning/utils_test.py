@@ -67,23 +67,31 @@ def predict_stack(model, stack, batch_size, input_channels="R"):
     return predictions
 
 
-def evaluate(model, dataloader, metrics):
-    """Return the metric values for the given dataloader and model."""
+def evaluate(model, dataloader, metrics, loss=None):
+    """Return the metric values for the given dataloader and model.
+    Can also add a loss (masking will be automatically computed on it)."""
     values = {}
     for key in metrics.keys():
         values[key] = 0
+    if loss is not None:
+        values["loss"] = 0
     
     # Compute metrics over all data
     model.eval()
     with torch.no_grad():
-        for i, (batch_x, batch_y, _) in enumerate(dataloader):
+        for i, (batch_x, batch_y, batch_mask) in enumerate(dataloader):
             batch_x = batch_x.to(model.device)
             batch_y = batch_y.to(model.device)
+            batch_mask = batch_mask.to(model.device)
             
             y_pred = model(batch_x)
 
             for key in metrics.keys():
                 values[key] += metrics[key](y_pred, batch_y).item() * batch_x.shape[0]
+            
+            if loss is not None:
+                masking = (1 - batch_mask)
+                values["loss"] += loss(y_pred[masking], batch_y[masking]).item() * batch_x.shape[0]
             
     for key in values.keys():
         values[key] /= len(dataloader.dataset)
