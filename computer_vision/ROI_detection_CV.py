@@ -21,7 +21,7 @@ import utils_common.register_cc as reg
 
 def main(args):
     # Parameters
-    datadir = "../dataset/validation/"
+    datadir = "/data/talabot/dataset/validation/"
     result_dir = "results_CV/"
     channels_to_process = [0] # R,G,B <--> 0,1,2
     scale_dice = 4.0 # scale of the cropping (w.r.t. ROI's bounding box) for cropped dice

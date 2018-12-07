@@ -25,7 +25,7 @@ def main():
     # Arguments for run_train
     args = Arguments(
             batch_size = 32,
-            data_dir = "../dataset/",
+            data_dir = "/data/talabot/dataset/",
             epochs = n_epochs,
             eval_test = False,
             input_channels = "R",

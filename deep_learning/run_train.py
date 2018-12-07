@@ -185,7 +185,7 @@ def main(args, model=None):
         test_metrics = evaluate(best_model, dataloaders["test"], 
                                 {"lossC%.1f" % args.scale_crop: crop_loss,
                                  "dice": dice_metric, "diC%.1f" % args.scale_crop: diceC_metric},
-                                loss=loss_fn)
+                                loss = loss_fn)
         if args.verbose:
             print("\nTest loss = {}".format(test_metrics["loss"]))
             print("Crop loss = {}".format(test_metrics["lossC%.1f" % args.scale_crop]))
@@ -218,12 +218,12 @@ if __name__ == "__main__":
     parser.add_argument(
             '--data_dir',
             type=str,
-            default="../dataset/", 
+            default="/data/talabot/dataset/", 
             help="directory to the train, validation, and test data. It should contain "
             "train/, validation/, and test/ subdirs (test/ is not mandatory, see --eval_test). "
             "These should be structured as: "
             "train_dir-->subdirs-->rgb_frames: folder with input images; and "
-            "train_dir-->subdirs-->seg_frames: folder with target images (default=../dataset/)"
+            "train_dir-->subdirs-->seg_frames: folder with target images (default=/data/talabot/dataset/)"
     )
     parser.add_argument(
             '--epochs', 
