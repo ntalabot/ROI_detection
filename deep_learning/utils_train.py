@@ -26,16 +26,16 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
             Contains the train and validation DataLoaders with respective keys 
             "train" and "valid".
         loss_fn: callable
-            The PyTorch loss function. It should take 2 tensors as input
-            (predictions and targets), and output a scalar tensor
+            The PyTorch loss function. It should take 3 tensors as input
+            (predictions, targets, and masks), and output a scalar tensor
         optimizer: PyTorch optimizer
             Optimzer for the SGD algorithm.
         n_epochs: int
             Number of epochs (pass over the whole data).
         metrics: dict of callable
             Dictionary of metrics to be computed over the data. It should take 
-            2 tensors as input (predictions and targets), and output a scalar 
-            tensor. Keys should be their name, value the callable.
+            3 tensors as input (predictions, targets, and masks), and output a 
+            scalar tensor. Keys should be their name, value the callable.
         criterion_metric: str (default = "loss")
             Name of the metric to use for early stopping. It can be "loss", in
             this case, it is based on the highest negative loss. Otherwise, it
@@ -120,7 +120,8 @@ def train(model, dataloaders, loss_fn, optimizer, n_epochs, metrics={},
                     y_pred_cpu = y_pred.cpu()
                     for key in metrics.keys():
                         running_metrics[key] += \
-                            metrics[key](y_pred_cpu, batch_y_cpu).item() * batch_x.shape[0]
+                            metrics[key](y_pred_cpu, batch_y_cpu, 
+                                   (1 - batch_mask_cpu)).item() * batch_x.shape[0]
                         
                     if phase == "train":
                         if ((i + 1) % int(len(dataloaders[phase]) / 10) == 0 or i == 0) and verbose: 

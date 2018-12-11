@@ -28,28 +28,31 @@ def get_crop_loss(loss_fn, scale=4.0, reduction="elementwise_mean", device=torch
     searches for these connected region.
     """
     # Create a subsitute loss function that makes sure its input are tensors
-    to_torch_loss_fn = lambda pred, target: loss_fn(torch.from_numpy(pred).to(device),
-                                                    torch.from_numpy(target).to(device))
+    to_torch_loss_fn = lambda pred, target, mask: loss_fn(torch.from_numpy(pred[mask]).to(device),
+                                                          torch.from_numpy(target[mask]).to(device))
     
-    return lambda preds, targets: torch.tensor(crop_metric(
+    return lambda preds, targets, masks: torch.tensor(crop_metric(
             to_torch_loss_fn, 
             preds.cpu().detach().numpy(), 
             targets.cpu().detach().numpy(), 
+            masks=masks.cpu().detach().numpy(),
             scale=scale, 
             reduction=reduction))
    
 def get_dice_metric(reduction='mean'):
     """Return a metric function that computes the dice coefficient."""
-    return lambda preds, targets: torch.tensor(
+    return lambda preds, targets, masks: torch.tensor(
             dice_coef((torch.sigmoid(preds.cpu()) > 0.5).detach().numpy(),
                       targets.cpu().detach().numpy(),
+                      masks=masks.cpu().detach().numpy(),
                       reduction=reduction))
 
 def get_crop_dice_metric(scale=4.0, reduction='mean'):
     """Return a metric function that computes the cropped dice coefficient."""
-    return lambda preds, targets: torch.tensor(
+    return lambda preds, targets, masks: torch.tensor(
             crop_metric(dice_coef,
                         (torch.sigmoid(preds.cpu()) > 0.5).detach().numpy(),
                         targets.cpu().detach().numpy(),
+                        masks=masks.cpu().detach().numpy(),
                         scale=scale,
                         reduction=reduction))

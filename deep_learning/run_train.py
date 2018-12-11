@@ -34,7 +34,7 @@ def main(args, model=None):
     out1_channels = 16
     
     # Seed the script
-    seed = 1
+    seed = args.seed
     random.seed(seed)
     np.random.seed(seed*10 + 1234)
     torch.manual_seed(seed*100 + 4321)
@@ -79,7 +79,7 @@ def main(args, model=None):
         synthetic_data = args.synthetic_data,
         synthetic_ratio = args.synthetic_ratio,
         synthetic_only = args.synthetic_only,
-        use_mask = args.loss_masking,
+        use_masks = args.use_masks,
         train_transform = lambda img: normalize_range(pad_transform(img)), train_target_transform = pad_transform,
         eval_transform = lambda img: normalize_range(pad_transform(img)), eval_target_transform = pad_transform
     )
@@ -111,7 +111,7 @@ def main(args, model=None):
         print("%d validation images." % N_VALID)
         if args.eval_test:
             print("%d test images." % N_TEST)
-        if args.loss_masking:
+        if args.use_masks:
             print("Loss masking is enabled.")
         print("{:.3f} positive weighting.".format(pos_weight.item()))
     
@@ -126,7 +126,6 @@ def main(args, model=None):
     # Make sure the given model is on the correct device
     else: 
         model.to(device)
-        
     if args.verbose:
         print("\nModel definition:", model, "\n")
     
@@ -183,9 +182,8 @@ def main(args, model=None):
     ## Evaluate best model over test data
     if args.eval_test:
         test_metrics = evaluate(best_model, dataloaders["test"], 
-                                {"lossC%.1f" % args.scale_crop: crop_loss,
-                                 "dice": dice_metric, "diC%.1f" % args.scale_crop: diceC_metric},
-                                loss = loss_fn)
+                                {"loss": lambda x,y,z: loss_fn(x[z], y[z]), "lossC%.1f" % args.scale_crop: crop_loss,
+                                 "dice": dice_metric, "diC%.1f" % args.scale_crop: diceC_metric})
         if args.verbose:
             print("\nTest loss = {}".format(test_metrics["loss"]))
             print("Crop loss = {}".format(test_metrics["lossC%.1f" % args.scale_crop]))
@@ -249,11 +247,6 @@ if __name__ == "__main__":
             help="learning rate for the stochastic gradient descent (default=0.001)"
     )
     parser.add_argument(
-            '--loss_masking', 
-            action="store_true",
-            help="enable the use of loss masking using pre-computed masks"
-    )
-    parser.add_argument(
             '--model_dir', 
             type=str,
             help="directory where the model is to be saved (if not set, the model won't be saved)"
@@ -306,6 +299,11 @@ if __name__ == "__main__":
             '-t', '--timeit', 
             action="store_true",
             help="time the script"
+    )
+    parser.add_argument(
+            '--use_masks', 
+            action="store_true",
+            help="enable the use of loss masking using pre-computed masks"
     )
     parser.add_argument(
             '-v', '--verbose', 

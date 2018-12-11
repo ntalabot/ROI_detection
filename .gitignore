@@ -1,6 +1,5 @@
 # Data files
 dataset/
-computer_vision/results_CV/
 split_data.py
 *.tif
 *.png
@@ -26,3 +25,5 @@ deep_learning/models
 # Results
 deep_learning/custom_unet
 deep_learning/synth_data
+computer_vision/results_CV/
+computer_vision/results_CV_old/

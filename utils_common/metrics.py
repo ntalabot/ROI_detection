@@ -11,20 +11,28 @@ import numpy as np
 from skimage import measure
 
 
-def loss_mae(predictions, targets, reduction='mean'):
+def loss_mae(predictions, targets, masks=None, reduction='mean'):
     """Compute the (Mean) Average Error between predictions and targets."""
+    if masks is None:
+        masks = np.ones(targets.shape)
+    masks = masks.astype(np.bool) 
+        
     if reduction in ["elementwise_mean", "mean", "ave", "average"]:
-        return np.abs(targets[:] - predictions[:]).mean()
+        return np.abs(targets[masks] - predictions[masks]).mean()
     elif reduction in ["sum"]:
-        return np.abs(targets[:] - predictions[:]).sum()
+        return np.abs(targets[masks] - predictions[masks]).sum()
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
-def loss_l2(predictions, targets, reduction='mean'):
+def loss_l2(predictions, targets, masks=None, reduction='mean'):
     """Compute the L2-norm loss between predictions and targets."""
+    if masks is None:
+        masks = np.ones(targets.shape)
+    masks = masks.astype(np.bool) 
+        
     loss = 0.0
     for i in range(len(targets)):
-        loss += np.linalg.norm(targets[i] - predictions[i])
+        loss += np.linalg.norm(targets[i][masks[i]] - predictions[i][masks[i]])
     
     if reduction in ["elementwise_mean", "mean", "ave", "average"]:
         return loss / len(targets)
@@ -33,15 +41,19 @@ def loss_l2(predictions, targets, reduction='mean'):
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
-def dice_coef(predictions, targets, reduction='mean'):
+def dice_coef(predictions, targets, masks=None, reduction='mean'):
     """Compute the Dice coefficient between predictions and targets."""
+    if masks is None:
+        masks = np.ones(targets.shape)
+    masks = masks.astype(np.bool) 
+    
     dice = 0.0
     for i in range(len(targets)):
-        total_pos = targets[i].sum() + predictions[i].sum()
+        total_pos = targets[i][masks[i]].sum() + predictions[i][masks[i]].sum()
         if total_pos == 0: # No true positive, and no false positive --> correct
             dice += 1.0
         else:
-            dice += 2.0 * np.logical_and(targets[i], predictions[i]).sum() / total_pos
+            dice += 2.0 * np.logical_and(targets[i][masks[i]], predictions[i][masks[i]]).sum() / total_pos
     
     if reduction in ["elementwise_mean", "mean", "ave", "average"]:
         return dice / len(targets)
@@ -50,7 +62,7 @@ def dice_coef(predictions, targets, reduction='mean'):
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
-def crop_metric(metric_fn, predictions, targets, scale=4.0, reduction='mean'):
+def crop_metric(metric_fn, predictions, targets, masks=None, scale=4.0, reduction='mean'):
     """
     Compute the metric around the cropped targets' connected regions.
     
@@ -76,8 +88,14 @@ def crop_metric(metric_fn, predictions, targets, scale=4.0, reduction='mean'):
             max_col = int(min(targets[i].shape[1], max_col + width * (scale-1) / 2))
             min_col = int(max(0, min_col - width * (scale-1) / 2))
             
+            if masks is None:
+                local_mask = None
+            else:
+                local_mask = np.array([masks[i][min_row:max_row, min_col:max_col]], dtype=np.bool)
+                
             metric += metric_fn(np.array([predictions[i][min_row:max_row, min_col:max_col]]), 
-                                np.array([targets[i][min_row:max_row, min_col:max_col]])) / \
+                                np.array([targets[i][min_row:max_row, min_col:max_col]]),
+                                local_mask) / \
                       len(regionprops) # Averaging factor for multiple region in same image
     
     if reduction in ["elementwise_mean", "mean", "ave", "average"]:
