@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+/!\ OLD ONE
 Script to find ROIs using only computer vision methods.
 Created on Thu Oct 11 17:25:14 2018
 
