@@ -32,7 +32,7 @@ def to_npint(stack, dtype=np.uint8, scaling=None):
     stack_int = (stack * scaling).astype(dtype)
     return stack_int
 
-def overlay_mask(image, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0]):
+def overlay_mask(image, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0], rescale_img=False):
     """Merge the mask as an overlay over the image."""
     mask_color = np.array(mask_color, dtype=np.float32)
     if image.ndim == 2:
@@ -40,11 +40,14 @@ def overlay_mask(image, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0]):
     else:
         overlay = image.copy()
         
+    if rescale_img:
+        overlay /= overlay.max()
+        
     overlay[mask.astype(np.bool), :] *= 1 - opacity
     overlay[mask.astype(np.bool), :] += mask_color * opacity
     return overlay
 
-def overlay_mask_stack(stack, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0]):
+def overlay_mask_stack(stack, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0], rescale_img=False):
     """Merge the mask as an overlay over the stack."""
     mask_color = np.array(mask_color, dtype=np.float32)
     if stack.ndim == 3:
@@ -53,5 +56,6 @@ def overlay_mask_stack(stack, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0]):
         overlay = stack.copy()
         
     for i in range(len(stack)):
-        overlay[i] = overlay_mask(overlay[i], mask[i], opacity=opacity, mask_color=mask_color)
+        overlay[i] = overlay_mask(overlay[i], mask[i], opacity=opacity, 
+               mask_color=mask_color, rescale_img=rescale_img)
     return overlay
