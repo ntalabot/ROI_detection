@@ -10,23 +10,26 @@ Created on Mon Dec 10 14:50:39 2018
 import os, warnings, time
 import argparse
 import numpy as np
-from skimage import io
+from skimage import io, filters
+from skimage.morphology import disk
 
 from cv_detector import cv_detect
 from utils_common.image import imread_to_float, to_npint
 from utils_common.metrics import dice_coef, crop_metric
 
 
-def main(args):
+def main(args, thresholding_fn, registration, selem, datadir=None):
     if args.timeit:
         start_time = time.time()
         
     # Parameters
-    datadir = "/data/talabot/dataset/validation/"
-    result_dir = "results_CV/"
+    if datadir is None:
+        datadir = "/data/talabot/dataset/validation/"
     scale_dice = 4.0 # scale of the cropping (w.r.t. ROI's bounding box) for cropped dice
     
-    os.makedirs(result_dir, exist_ok=True)
+    if args.save:
+        os.makedirs(args.result_dir, exist_ok=True)
+        
     losses_dice = []
     losses_diC = []
     losses_dice_mask = []
@@ -34,7 +37,8 @@ def main(args):
     # Loop over stacks
     data_dirs = sorted(os.listdir(datadir))
     for folder_num, subdir in enumerate(data_dirs):
-        print("Starting processing folder %d/%d." % (folder_num + 1, len(data_dirs)))
+        if args.verbose:
+            print("Starting processing folder %d/%d." % (folder_num + 1, len(data_dirs)))
         # Load stacks
         rgb_stack = imread_to_float(os.path.join(datadir, subdir, "RGB.tif"))
         true_seg = imread_to_float(os.path.join(datadir, subdir, "seg_ROI.tif"))
@@ -44,13 +48,14 @@ def main(args):
             mask_stack = np.zeros_like(true_seg)
         
         # Compute results
-        predictions = cv_detect(rgb_stack)
+        predictions = cv_detect(rgb_stack, thresholding_fn, registration, selem)
         
         # Save results and disable warnings about low contrast
-        os.makedirs(os.path.join(result_dir, subdir), exist_ok=True)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            io.imsave(os.path.join(result_dir, subdir, "preds.tif"), to_npint(predictions, dtype=np.uint8))
+        if args.save:
+            os.makedirs(os.path.join(args.result_dir, subdir), exist_ok=True)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                io.imsave(os.path.join(args.result_dir, subdir, "preds.tif"), to_npint(predictions, dtype=np.uint8))
         
         ## Compute losses
         losses_dice.append(dice_coef(predictions, true_seg, reduction='sum'))
@@ -79,10 +84,31 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Detect ROI with computer vision in the data.")
     parser.add_argument(
+            '--result_dir', 
+            type=str,
+            default="results_CV", 
+            help="name of the directory where to save the results (see --save "
+            "argument) (default = results_CV)"
+    )
+    parser.add_argument(
+            '-s', '--save', 
+            action="store_true",
+            help="save the results (see --result_dir argument)"
+    )
+    parser.add_argument(
             '-t', '--timeit', 
             action="store_true",
             help="time the script"
     )
+    parser.add_argument(
+            '-v', '--verbose', 
+            action="store_true",
+            help="increase the verbosity (display folder being processed)"
+    )
     args = parser.parse_args()
     
-    main(args)
+    for phase in ["train", "validation", "test"]:
+        args.result_dir = os.path.join("results_CV/", phase)
+        print("\nProcessing %s set." % phase)
+        main(args, filters.threshold_otsu, registration=False, selem=disk(1), 
+             datadir=os.path.join("/data/talabot/dataset/", phase))

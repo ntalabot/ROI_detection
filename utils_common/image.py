@@ -34,7 +34,7 @@ def to_npint(stack, dtype=np.uint8, scaling=None):
 
 def overlay_mask(image, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0]):
     """Merge the mask as an overlay over the image."""
-    mask_color = np.array(mask_color)
+    mask_color = np.array(mask_color, dtype=np.float32)
     if image.ndim == 2:
         overlay = color.gray2rgb(image)
     else:
@@ -46,7 +46,7 @@ def overlay_mask(image, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0]):
 
 def overlay_mask_stack(stack, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0]):
     """Merge the mask as an overlay over the stack."""
-    mask_color = np.array(mask_color)
+    mask_color = np.array(mask_color, dtype=np.float32)
     if stack.ndim == 3:
         overlay = color.gray2rgb(stack)
     else:
