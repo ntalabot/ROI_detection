@@ -38,7 +38,7 @@ def main(args, thresholding_fn, registration, selem, datadir=None):
     data_dirs = sorted(os.listdir(datadir))
     for folder_num, subdir in enumerate(data_dirs):
         if args.verbose:
-            print("Starting processing folder %d/%d." % (folder_num + 1, len(data_dirs)))
+            print("Folder %d/%d." % (folder_num + 1, len(data_dirs)))
         # Load stacks
         rgb_stack = imread_to_float(os.path.join(datadir, subdir, "RGB.tif"))
         true_seg = imread_to_float(os.path.join(datadir, subdir, "seg_ROI.tif"))
@@ -109,6 +109,6 @@ if __name__ == "__main__":
     
     for phase in ["train", "validation", "test"]:
         args.result_dir = os.path.join("results_CV/", phase)
-        print("\nProcessing %s set." % phase)
+        print("\nProcessing %s set:" % phase)
         main(args, filters.threshold_otsu, registration=False, selem=disk(1), 
              datadir=os.path.join("/data/talabot/dataset/", phase))

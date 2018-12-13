@@ -8,6 +8,7 @@ split_data.py
 synthetic_data/synth_semih.ipynb
 utils_common/dice_visualization.ipynb
 computer_vision/results_verification.ipynb
+computer_vision/run_denoising.py
 
 # Mask creation
 run_mask.py
