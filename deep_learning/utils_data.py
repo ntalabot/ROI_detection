@@ -142,7 +142,7 @@ def get_filenames(data_dir, use_masks=False,
                 idx = int(re.search(r'\d+$', frame_filename.split('.')[-2]).group(0))
                 y_tmp[idx] = os.path.join(data_subdir, "seg_frames", frame_filename)
         # Maks (if any)
-        if os.path.isdir(os.path.join(data_subdir, "mask_frames")):
+        if use_masks and os.path.isdir(os.path.join(data_subdir, "mask_frames")):
             for frame_filename in sorted(os.listdir(os.path.join(data_subdir, "mask_frames"))):
                 if frame_filename.lower().endswith(valid_extensions):
                     # Find suffix ID number
@@ -248,9 +248,10 @@ def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloade
             If not set, all data under "train/" and "synthetic/" are used for 
             the training (this is the default use).
             If set, it represents the ratio of synthetic vs. real data to use
-            for training. For instance, if set to 0.25 and there are 100 
-            experiments in "train/", 75 of them will be randomly chosen, as
-            well as 25 synthetic experiments to build the train set.
+            for training, and is based over real data size. For instance, if
+            there are 1000 real frames and the synthetic_ratio is 25, enough
+            real experiments will be taken to be as close as possible to 750
+            frames, and enough synthetic experiments to be as close as 250 frames.
         synthetic_only: bool (default = False)
             If True, the train dataloader will contain only the synthetic data.
             As opposed to synthetic_ratio=1.0, this will use all of the data
@@ -287,14 +288,45 @@ def get_all_dataloaders(data_dir, batch_size, input_channels="R", test_dataloade
                          in sorted(os.listdir(os.path.join(data_dir, "train/")))] + \
                         [os.path.join(data_dir, "synthetic/", subdir) for subdir 
                          in sorted(os.listdir(os.path.join(data_dir, "synthetic/")))]
-        else: # specific ration between real and synthetic data
-            real_dirs = np.random.permutation(sorted(os.listdir(os.path.join(data_dir, "train/"))))
+        else: # specific ratio between real and synthetic data
+            # Load (in random order) real and synthetic folder names
+            real_dirs = np.random.permutation(os.listdir(os.path.join(data_dir, "train/")))
             real_dirs = [os.path.join(data_dir, "train/", subdir) for subdir in real_dirs]
-            synth_dirs = np.random.permutation(sorted(os.listdir(os.path.join(data_dir, "synthetic/"))))
+            synth_dirs = np.random.permutation(os.listdir(os.path.join(data_dir, "synthetic/")))
             synth_dirs = [os.path.join(data_dir, "synthetic/", subdir) for subdir in synth_dirs]
-            n_dirs = len(real_dirs)
-            train_dir = real_dirs[int(np.rint(synthetic_ratio * n_dirs)):] + \
-                        synth_dirs[:int(np.rint(synthetic_ratio * n_dirs))]
+            
+            # Create according array with frame quantity
+            real_frames = np.array([len(os.listdir(os.path.join(real_dir, "rgb_frames/"))) 
+                                    for real_dir in real_dirs])
+            synth_frames = np.array([len(os.listdir(os.path.join(synth_dir, "rgb_frames/"))) 
+                                     for synth_dir in synth_dirs])
+            
+            # If ratio is 0 or 1, take only real or synth
+            if synthetic_ratio == 0.0:
+                train_dir = real_dirs
+            elif synthetic_ratio == 1.0: # take approximately as many frames as there is in real data
+                n_tot_real_frames = np.sum(real_frames) # total number of frames in real data
+                train_dir = synth_dirs
+                n_synth_dirs = np.argmin(np.abs(np.cumsum(synth_frames) - n_tot_real_frames)) + 1
+                
+                train_dir = synth_dirs[:n_synth_dirs]
+            else:            
+                # Find number of real dirs and real synths to get good ratio of frames
+                n_tot_real_frames = np.sum(real_frames) # total number of frames in real data
+                n_real_dirs = np.argmin(np.abs(np.cumsum(real_frames) - \
+                                               (1 - synthetic_ratio) * n_tot_real_frames)) + 1
+                n_real_frames = np.sum(real_frames[:n_real_dirs]) # actual number of frames in real data
+                # If not enough synthetic data, take all of it, and reduce real data accordingly
+                n_synth_frames = np.sum(synth_frames)
+                if n_synth_frames < synthetic_ratio / (1 - synthetic_ratio) * n_real_frames:
+                    n_synth_dirs = len(synth_dirs)
+                    n_real_dirs = np.argmin(np.abs(np.cumsum(real_frames) - \
+                                                   (1 - synthetic_ratio) / synthetic_ratio * n_synth_frames)) + 1
+                else:
+                    n_synth_dirs = np.argmin(np.abs(np.cumsum(synth_frames) - \
+                                             synthetic_ratio / (1 - synthetic_ratio) * n_real_frames)) + 1
+                
+                train_dir = real_dirs[:n_real_dirs] + synth_dirs[:n_synth_dirs]
     else:
         train_dir = os.path.join(data_dir, "train/")
     
