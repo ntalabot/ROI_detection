@@ -155,7 +155,7 @@ def register_stack(stack, ref_num=0, channels=[0,1], return_shifts=False):
         if stack.ndim == 3:
             reg_stack[i] = shift_image(stack[i], row_list[i], col_list[i])
         else:
-            for c in channels:
+            for c in range(stack.shape[-1]):
                 reg_stack[i,:,:,c] = shift_image(stack[i,:,:,c], row_list[i], col_list[i])
     reg_stack = reg_stack.clip(min=0.0, max=1.0)
     
