@@ -59,3 +59,17 @@ def overlay_mask_stack(stack, mask, opacity=0.25, mask_color=[1.0, 0.0, 0.0], re
         overlay[i] = overlay_mask(overlay[i], mask[i], opacity=opacity, 
                mask_color=mask_color, rescale_img=rescale_img)
     return overlay
+
+def overlay_preds_targets(predictions, targets, masks=None):
+    """Create an image with predictions and targets (and masks) for easy comparison."""
+    # Add predicted annotations as green
+    correct = overlay_mask_stack(predictions, np.logical_and(predictions, targets), 
+                                 opacity=1, mask_color=[0,1,0])
+    # Add missed annotations as red
+    incorrect = overlay_mask_stack(correct, np.logical_and(targets, np.logical_not(predictions)), 
+                                   opacity=1, mask_color=[1,0,0])
+    if masks is None:
+        final = incorrect
+    else:
+        final = overlay_mask_stack(incorrect, masks, opacity=0.5, mask_color=[1,1,0])
+    return final
