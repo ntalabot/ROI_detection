@@ -18,7 +18,7 @@ from skimage import io, draw
 from scipy.stats import multivariate_normal
 from imgaug import augmenters as iaa
 
-from utils_common.image import to_npint
+from utils_common.image import to_npint, gray2red
 from utils_common.processing import flood_fill
 
 
@@ -157,14 +157,6 @@ def synthetic_stack(shape, n_images, n_neurons):
         synth_stack = synth_stack.clip(0, rand_sat) / rand_sat
     
     return synth_stack, synth_seg
-
-
-def gray2red(image):
-    """Convert the grayscale image to red in RGB mode."""
-    red = image
-    green = np.zeros_like(image)
-    blue = np.zeros_like(image)
-    return np.stack([red, green, blue], axis=-1)
 
 
 if __name__ == "__main__":
