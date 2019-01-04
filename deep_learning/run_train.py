@@ -16,6 +16,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from skimage import io
+import imgaug.augmenters as iaa
 
 import torch
 
@@ -47,7 +48,18 @@ def main(args, model=None):
     if args.verbose:
         print("Device set to '{}'.".format(device))
     
-    # Following transform is to avoid 2x2 maxpooling on odd-sized images
+    # Create random augment sequence for data augmentation
+    if args.data_aug:
+        aug_seq = iaa.Sequential([
+            iaa.GammaContrast((0.7, 1.3)) # Gamma correction
+        ])
+        aug_fn = aug_seq.augment_image
+        print("Data augmentation is enabled.")
+    else:
+        aug_fn = lambda x: x # identity function
+    
+    # Following transform is to avoid 2x2 maxpoolings on odd-sized images
+    # (it makes sure down- and up-sizing are consistent throughout the network)
     def pad_transform(image):
         """Pad images to multiple of 2**u_depth, if needed."""
         factor = 2 ** u_depth
@@ -80,7 +92,7 @@ def main(args, model=None):
         synthetic_ratio = args.synthetic_ratio,
         synthetic_only = args.synthetic_only,
         use_masks = args.use_masks,
-        train_transform = lambda img: normalize_range(pad_transform(img)), train_target_transform = pad_transform,
+        train_transform = lambda img: normalize_range(pad_transform(aug_fn(img))), train_target_transform = pad_transform,
         eval_transform = lambda img: normalize_range(pad_transform(img)), eval_target_transform = pad_transform
     )
     
@@ -212,6 +224,11 @@ if __name__ == "__main__":
             type=int,
             default=32, 
             help="batch_size for the dataloaders (default=32)"
+    )
+    parser.add_argument(
+            '--data_aug', 
+            action="store_true",
+            help="enable data augmentation on train set (see code for augmentation sequence)"
     )
     parser.add_argument(
             '--data_dir',

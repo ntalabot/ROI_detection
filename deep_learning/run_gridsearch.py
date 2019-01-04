@@ -25,6 +25,7 @@ def main():
     # Arguments for run_train
     args = Arguments(
             batch_size = 32,
+            data_aug = False,
             data_dir = "/data/talabot/dataset_cv-annotated/",
             epochs = n_epochs,
             eval_test = False,
