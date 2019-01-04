@@ -34,6 +34,9 @@ def to_npint(stack, dtype=np.uint8, float_scaling=None):
         if float_scaling is None:
             float_scaling = np.iinfo(dtype).max
         stack_int = (stack * float_scaling).astype(dtype)
+    elif stack.dtype == np.bool:
+        # If boolean, we set 1 to max range of dtype (e.g., 255 for np.uint8)
+        stack_int = stack.astype(dtype) * np.iinfo(dtype).max
     else:
         stack_int = stack.astype(dtype)
     return stack_int
