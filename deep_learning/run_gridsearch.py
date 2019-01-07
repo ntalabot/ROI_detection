@@ -45,6 +45,8 @@ def main():
     )
     model = None
     args.synthetic_data = True
+    args.data_aug = True
+    print("Data augmentation is enabled.\n")
     
     print("Input channels: R")
     for synth_ratio in synth_ratios:

@@ -54,7 +54,8 @@ def main(args, model=None):
             iaa.GammaContrast((0.7, 1.3)) # Gamma correction
         ])
         aug_fn = aug_seq.augment_image
-        print("Data augmentation is enabled.")
+        if args.verbose:
+            print("Data augmentation is enabled.")
     else:
         aug_fn = lambda x: x # identity function
     
@@ -302,8 +303,8 @@ if __name__ == "__main__":
             action="store_true",
             help="use only the synthetic data for training. This is different "
             "than using --synthetic_ration 1.0 as it will always use all the "
-            "synthetic data, without being limited to the number of experiment "
-            "in the train set"
+            "synthetic data, without being limited to the number of frames "
+            "in the train folder"
     )
     parser.add_argument(
             '--synthetic_ratio', 
