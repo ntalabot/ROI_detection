@@ -40,7 +40,7 @@ def cv_detect(rgb_stack, thresholding_fn=filters.threshold_otsu,
     def denoise_stack(channel_num, h_denoise):
         """Denoise selected channel from loop_stack (function used for parallelization)."""
         loop_channel = loop_stack[..., channel_num]
-        denoised = np.zeros_like(loop_channel)
+        denoised = np.zeros(stack[...,0].shape, dtype=loop_channel.dtype)
         for i in range(len(stack)):
             denoised[i] = cv2.fastNlMeansDenoisingMulti(loop_channel, i + (temporal_window_size - 1)//2, 
                     temporal_window_size, None, h_denoise, 7, search_window_size)
