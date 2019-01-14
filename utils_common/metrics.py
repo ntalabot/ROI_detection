@@ -21,6 +21,8 @@ def loss_mae(predictions, targets, masks=None, reduction='mean'):
         return np.abs(targets[masks] - predictions[masks]).mean()
     elif reduction in ["sum"]:
         return np.abs(targets[masks] - predictions[masks]).sum()
+    elif reduction in ["array", "no_reduction", "full"]:
+        return np.abs(targets[masks] - predictions[masks])
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
@@ -30,14 +32,16 @@ def loss_l2(predictions, targets, masks=None, reduction='mean'):
         masks = np.ones(targets.shape)
     masks = masks.astype(np.bool) 
         
-    loss = 0.0
+    loss = []
     for i in range(len(targets)):
-        loss += np.linalg.norm(targets[i][masks[i]] - predictions[i][masks[i]])
+        loss.append(np.linalg.norm(targets[i][masks[i]] - predictions[i][masks[i]]))
     
     if reduction in ["elementwise_mean", "mean", "ave", "average"]:
-        return loss / len(targets)
+        return np.mean(loss)
     elif reduction in ["sum"]:
-        return loss
+        return np.sum(loss)
+    elif reduction in ["array", "no_reduction", "full"]:
+        return np.array(loss)
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
@@ -47,18 +51,20 @@ def dice_coef(predictions, targets, masks=None, reduction='mean'):
         masks = np.ones(targets.shape)
     masks = masks.astype(np.bool) 
     
-    dice = 0.0
+    dice = []
     for i in range(len(targets)):
         total_pos = targets[i][masks[i]].sum() + predictions[i][masks[i]].sum()
         if total_pos == 0: # No true positive, and no false positive --> correct
-            dice += 1.0
+            dice.append(1.0)
         else:
-            dice += 2.0 * np.logical_and(targets[i][masks[i]], predictions[i][masks[i]]).sum() / total_pos
+            dice.append(2.0 * np.logical_and(targets[i][masks[i]], predictions[i][masks[i]]).sum() / total_pos)
     
     if reduction in ["elementwise_mean", "mean", "ave", "average"]:
-        return dice / len(targets)
+        return np.mean(dice)
     elif reduction in ["sum"]:
-        return dice
+        return np.sum(dice)
+    elif reduction in ["array", "no_reduction", "full"]:
+        return np.array(dice)
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
 
@@ -68,7 +74,7 @@ def crop_metric(metric_fn, predictions, targets, masks=None, scale=4.0, reductio
     
     Size of the cropped region will be bounding_box * scale.
     """
-    metric = 0.0
+    metric = []
     n_no_positive = 0 # number of target with no positive pixels (fully background)
     for i in range(len(targets)):
         labels = measure.label(targets[i])
@@ -78,6 +84,7 @@ def crop_metric(metric_fn, predictions, targets, masks=None, scale=4.0, reductio
             continue
         regionprops = measure.regionprops(labels)
         
+        local_metric = 0.0
         # Loop over targets' connected regions
         for region in regionprops:
             min_row, min_col, max_row, max_col = region.bbox
@@ -93,14 +100,17 @@ def crop_metric(metric_fn, predictions, targets, masks=None, scale=4.0, reductio
             else:
                 local_mask = np.array([masks[i][min_row:max_row, min_col:max_col]], dtype=np.bool)
                 
-            metric += metric_fn(np.array([predictions[i][min_row:max_row, min_col:max_col]]), 
+            local_metric += metric_fn(np.array([predictions[i][min_row:max_row, min_col:max_col]]), 
                                 np.array([targets[i][min_row:max_row, min_col:max_col]]),
                                 local_mask) / \
-                      len(regionprops) # Averaging factor for multiple region in same image
+                            len(regionprops) # Averaging factor for multiple region in same image
+        metric.append(local_metric)
     
     if reduction in ["elementwise_mean", "mean", "ave", "average"]:
-        return metric / (len(targets) - n_no_positive)
+        return np.sum(metric) / (len(targets) - n_no_positive)
     elif reduction in ["sum"]:
-        return metric
+        return np.sum(metric)
+    elif reduction in ["array", "no_reduction", "full"]:
+        return np.array(metric)
     else:
         raise ValueError("""Unknown reduction method "%s".""" % reduction)
