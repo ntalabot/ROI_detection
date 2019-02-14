@@ -1,6 +1,7 @@
 # Computer Vision
-Code for the computer vision approach to the automatic ROI detections.
+Code for the computer vision approach to the automatic ROI detection.
 
 # Files
-  * `ROI_detection_CV.py`: main script to detect the ROI over the given dataset, using computer vision methods
+  * `cv_detector.py`: Function to detect the ROI with the CV detector
+  * `run_detection.py`: main script to detect the ROIs over the given dataset, using `cv_detector.py`
   * `utils_common`: link to the common utils library
