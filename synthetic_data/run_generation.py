@@ -68,7 +68,7 @@ def synthetic_stack(shape, n_images, n_neurons):
     meshgrid[:,:,0], meshgrid[:,:,1] = np.meshgrid(cols, rows) # note the order!
     for i in range(n_neurons):
         # Create neuron infinitly until in image and no overlap with another
-        # TODO: change this to something that cannot loop to infinity
+        # Can currently loop without end if the neurons cannot be placed randomly
         while True:
             # Mean and covariance matrix of gaussian (manually tuned)
             # Note that x and y axes are col and row (so, inversed!)

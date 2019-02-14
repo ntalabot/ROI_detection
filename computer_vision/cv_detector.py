@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Contains useful functions for detecting ROI with computer vision.
+Contains a function to apply the CV detector to an RGB stack.
 Created on Mon Dec 10 14:52:18 2018
 
 @author: nicolas

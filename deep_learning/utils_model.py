@@ -30,48 +30,6 @@ def weights_initialization(model):
                 torch.nn.init.zeros_(m.bias)
 
 
-#class CustomNet(torch.nn.Module):
-#    """Definition of a custom written model."""
-#    def __init__(self, shape, activation=torch.nn.ReLU, device=torch.device("cpu")):
-#        """Initialize the model."""
-#        super(CustomNet, self).__init__()
-#        self.height, self.width, self.in_channels = shape
-#        self.activation = activation
-#        
-#        # Initialize the networks modules
-#        self.conv1 = torch.nn.Conv2d(self.in_channels, 4, 3, stride=3, padding=1)
-#        self.bn1 = torch.nn.BatchNorm2d(4)
-#        self.conv2 = torch.nn.Conv2d(4, 8, 3, stride=3, padding=1)
-#        self.bn2 = torch.nn.BatchNorm2d(8)
-#        self.conv_t1 = torch.nn.ConvTranspose2d(8, 4, 3, stride=3, padding=1, output_padding=(1,0))
-#        self.bn3 = torch.nn.BatchNorm2d(4)
-#        self.conv_t2 = torch.nn.ConvTranspose2d(4, 1, 3, stride=3, padding=(2, 0), output_padding=(1,1))
-#        
-#        # Initialize weights
-#        weights_initialization(self)
-#        
-#        # Make sure the model is in the correct device
-#        self.to(device)
-#
-#    def forward(self, x):
-#        """Perform the forward pass."""
-#        x = self.activation(self.conv1(x))
-#        x = self.bn1(x)
-#        x = self.activation(self.conv2(x))
-#        x = self.bn2(x)
-#        x = self.activation(self.conv_t1(x))
-#        x = self.bn3(x)
-#        logits = self.conv_t2(x)
-#        logits = logits.view(-1, self.height, self.width)
-#        return logits
-#    
-#    def to(self, *args, **kwargs):
-#        """Modifiy model.device and call Module.to()."""
-#        device, _, _ = torch._C._nn._parse_to(*args, **kwargs)
-#        self.device = device
-#        return super(CustomNet, self).to(*args, **kwargs)
-
-
 class UNetConv(torch.nn.Module):
     """U-Net like convolution block."""
     def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, 

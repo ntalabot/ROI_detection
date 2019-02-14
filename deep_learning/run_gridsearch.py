@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script to launch a grid-search over hyperparamters.
+Script to launch a grid-search over hyperparamters, using the run_train.py script.
 Created on Wed Oct 31 16:38:54 2018
 
 @author: nicolas
